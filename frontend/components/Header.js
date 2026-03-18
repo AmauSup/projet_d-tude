@@ -1,35 +1,17 @@
 import React from 'react';
+import './Header.css';
 
 export default function Header({ navItems = [] }) {
 	return (
-		<header
-			style={{
-				borderBottom: '1px solid #e5e7eb',
-				background: '#ffffff',
-			}}
-		>
-			<div
-				style={{
-					maxWidth: 1100,
-					margin: '0 auto',
-					padding: '14px 16px',
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'space-between',
-					gap: 16,
-				}}
-			>
-				<a href="#/" style={{ textDecoration: 'none', color: '#111827', fontWeight: 700, fontSize: 18 }}>
+		<header className="site-header">
+			<div className="site-header__container">
+				<a href="#/" className="site-header__brand">
 					Althea Shop
 				</a>
 
-				<nav style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+				<nav className="site-header__nav">
 					{navItems.map((item) => (
-						<a
-							key={item.path}
-							href={`#${item.path}`}
-							style={{ textDecoration: 'none', color: '#2563eb', fontSize: 14, fontWeight: 600 }}
-						>
+						<a key={item.path} href={`#${item.path}`} className="site-header__link">
 							{item.label}
 						</a>
 					))}

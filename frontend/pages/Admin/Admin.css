@@ -1,0 +1,30 @@
+.admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-kpis .card {
+  text-align: center;
+}
+
+.admin-kpis h3 {
+  color: #0c4a6e;
+  font-size: 0.95rem;
+}
+
+.admin-kpis p {
+  color: #0ea5e9;
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 4px 0 0 0;
+}
+
+.admin-table-placeholder {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #64748b;
+}

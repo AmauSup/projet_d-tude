@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import './styles/App.css';
 
 import Home from './pages/Home/Home';
 import Category from './pages/Category/Category';
@@ -61,18 +62,10 @@ export default function App() {
 	const CurrentPage = useMemo(() => routes[currentPath] || Home, [currentPath]);
 
 	return (
-		<div
-			style={{
-				minHeight: '100vh',
-				display: 'flex',
-				flexDirection: 'column',
-				fontFamily: 'Arial, sans-serif',
-				color: '#1f2937',
-			}}
-		>
+		<div className="app-shell">
 			<Header navItems={navItems} />
 
-			<main style={{ flex: 1, maxWidth: 1100, width: '100%', margin: '0 auto', padding: '24px 16px' }}>
+			<main className="app-main">
 				<CurrentPage />
 			</main>
 

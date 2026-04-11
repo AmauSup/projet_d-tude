@@ -33,6 +33,18 @@
   cursor: pointer;
 }
 
+.site-header__burger {
+  display: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 @supports not ((-webkit-background-clip: text) and (-webkit-text-fill-color: transparent)) {
   .site-header__brand {
     color: #0284c7;
@@ -45,6 +57,11 @@
   flex-wrap: wrap;
   gap: 4px;
   min-width: 0;
+}
+
+.site-header__menu-group {
+  display: none;
+  gap: 4px;
 }
 
 .site-header__link {
@@ -80,6 +97,10 @@
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.site-header__locale {
+  width: 78px;
 }
 
 .site-header__utility {
@@ -136,6 +157,10 @@
     grid-area: nav;
   }
 
+  .site-header__menu-group {
+    display: flex;
+  }
+
   .site-header__actions {
     grid-area: actions;
     justify-self: end;
@@ -147,9 +172,16 @@
     grid-template-columns: 1fr;
     grid-template-areas:
       'brand'
+      'burger'
       'search'
       'actions'
       'nav';
+  }
+
+  .site-header__burger {
+    display: inline-flex;
+    grid-area: burger;
+    justify-self: start;
   }
 
   .site-header__search {
@@ -159,9 +191,23 @@
 
   .site-header__nav {
     width: 100%;
+    display: none;
+    flex-direction: column;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+  }
+
+  .site-header__nav.is-open {
+    display: flex;
+  }
+
+  .site-header__menu-group {
+    display: flex;
+    flex-direction: column;
   }
 
   .site-header__actions {
     justify-self: start;
+    flex-wrap: wrap;
   }
 }

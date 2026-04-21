@@ -3,16 +3,17 @@ import './Header.css';
 import { useI18n } from '../contexts/I18nContext.jsx';
 
 export default function Header({
-  navItems = [],
-  currentPath,
-  cartCount = 0,
-  searchValue = '',
-  isAuthenticated = false,
-  isAdmin = false,
-  userMenuItems = [],
-  onNavigate,
-  onSearchSubmit,
-  onLogout,
+	navItems = [],
+	currentPath,
+	cartCount = 0,
+	searchValue = '',
+	isAuthenticated = false,
+	isAdmin = false,
+	userMenuItems = [],
+	onNavigate,
+	onSearchSubmit,
+	onLogout,
+	showRegisterAction = false,
 }) {
 	const { locale, setLocale, t } = useI18n();
 	const [query, setQuery] = useState(searchValue);
@@ -100,9 +101,14 @@ export default function Header({
 						Panier
 						{cartCount > 0 ? <span className="site-header__badge">{cartCount}</span> : null}
 					</button>
-					<button type="button" className="site-header__utility" onClick={() => onNavigate('/account')}>
-						{isAuthenticated ? t('nav.account') : t('nav.login')}
+					<button type="button" className="site-header__utility" onClick={() => onNavigate('/login')}>
+						{t('nav.login')}
 					</button>
+					{showRegisterAction && (
+						<button type="button" className="site-header__utility" onClick={() => onNavigate('/register')}>
+							{t('nav.register')}
+						</button>
+					)}
 					{isAdmin ? (
 						<button type="button" className="site-header__utility" onClick={() => onNavigate('/admin/dashboard')}>
 							{t('nav.admin')}

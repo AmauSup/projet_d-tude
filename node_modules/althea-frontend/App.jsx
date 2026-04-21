@@ -398,9 +398,7 @@ export default function App() {
     () => [
       { label: t('nav.home'), path: '/' },
       { label: t('nav.catalog'), path: '/catalog' },
-      { label: t('nav.search'), path: '/search' },
       { label: t('nav.orders'), path: '/orders' },
-      { label: t('nav.contact'), path: '/contact' },
     ],
     [t],
   );
@@ -409,22 +407,12 @@ export default function App() {
     () =>
       session.isAuthenticated
         ? [
-            { label: 'Mes paramètres', path: '/account/settings' },
+            { label: 'Mon compte', path: '/account' },
             { label: 'Mes commandes', path: '/orders' },
-            { label: 'CGU', path: '/terms' },
-            { label: 'Mentions légales', path: '/legal' },
-            { label: 'Contact', path: '/contact' },
-            { label: 'À propos', path: '/about' },
+            { label: 'Déconnexion', path: '/logout' },
           ]
-        : [
-            { label: t('nav.login'), path: '/login' },
-            { label: t('nav.register'), path: '/register' },
-            { label: 'CGU', path: '/terms' },
-            { label: 'Mentions légales', path: '/legal' },
-            { label: 'Contact', path: '/contact' },
-            { label: 'À propos', path: '/about' },
-          ],
-    [session.isAuthenticated, t],
+        : [],
+    [session.isAuthenticated],
   );
 
   const formattedAdminStats = {
@@ -445,6 +433,7 @@ export default function App() {
         onNavigate={navigate}
         onSearchSubmit={handleHeaderSearch}
         onLogout={handleLogout}
+        showRegisterAction={!session.isAuthenticated}
       />
 
       <main className="app-main">

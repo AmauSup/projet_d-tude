@@ -50,7 +50,7 @@ export default function Cart({ items = [], summary, isAuthenticated, onUpdateQua
 					<button className="btn btn--primary" type="button" disabled={items.length === 0 || summary.unavailableCount > 0} onClick={() => onNavigate('/checkout')}>
 						Passer à la caisse
 					</button>
-					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/category')}>
+					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/catalog')}>
 						Continuer mes achats
 					</button>
 				</aside>

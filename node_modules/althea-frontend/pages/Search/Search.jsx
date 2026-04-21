@@ -53,7 +53,9 @@ export default function Search({ categories = [], criteria, onChangeCriteria, re
 							<div className="card__image" />
 							<h3>{product.name}</h3>
 							<p>{product.shortDescription}</p>
-							<p className="helper-text">Rang de pertinence : {product.relevanceScore === 99 ? 'filtre annexe' : product.relevanceScore}</p>
+							<span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
+							{product.availableStock > 0 ? `${product.availableStock} en stock` : 'En rupture de stock'}
+						</span>
 							<strong>{formatPrice(product.priceCents)}</strong>
 							<button className="btn btn--secondary" type="button" onClick={() => onOpenProduct(product.slug)}>
 								Voir le produit

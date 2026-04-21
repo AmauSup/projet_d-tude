@@ -77,8 +77,9 @@ function getPasswordValidation(password) {
 }
 
 function RequireAuth({ isAuthenticated, children }) {
+  const location = useLocation();
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   return children;
@@ -319,6 +320,12 @@ export default function App() {
 
     navigate('/confirmation', { order: nextOrder.id });
     return { success: true, message: 'Commande validée.' };
+  };
+
+  const handleUpdateOrderStatus = (orderId, status) => {
+    setOrders((previous) =>
+      previous.map((order) => (order.id === orderId ? { ...order, status } : order)),
+    );
   };
 
   const handleLogout = () => {
@@ -575,7 +582,14 @@ export default function App() {
             }
           />
 
-          <Route path="/orders" element={<OrderHistory orders={orders} products={products} onNavigate={navigate} />} />
+          <Route
+            path="/orders"
+            element={
+              <RequireAuth isAuthenticated={session.isAuthenticated}>
+                <OrderHistory orders={orders} products={products} onNavigate={navigate} />
+              </RequireAuth>
+            }
+          />
           <Route path="/contact" element={<Contact onNavigate={navigate} />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/legal" element={<LegalPage />} />
@@ -591,9 +605,9 @@ export default function App() {
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard stats={formattedAdminStats} />} />
-            <Route path="products" element={<AdminProducts />} />
-            <Route path="categories" element={<AdminCategories />} />
-            <Route path="orders" element={<AdminOrders />} />
+            <Route path="products" element={<AdminProducts products={products} categories={sortedCategories} onToggleProductPriority={handleToggleProductPriority} onToggleFeatured={handleToggleFeatured} onToggleProductAvailability={handleToggleProductAvailability} />} />
+            <Route path="categories" element={<AdminCategories categories={sortedCategories} onSetCategoryOrder={handleSetCategoryOrder} />} />
+            <Route path="orders" element={<AdminOrders orders={orders} products={products} onUpdateOrderStatus={handleUpdateOrderStatus} />} />
             <Route
               path="content/home"
               element={

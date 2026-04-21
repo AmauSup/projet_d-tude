@@ -76,6 +76,11 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 			return;
 		}
 
+		setFeedback('');
+		setStep(4);
+	};
+
+	const handlePlaceOrder = () => {
 		const result = onPlaceOrder({ billingAddress: address, paymentDetails: payment });
 		setFeedback(result.message);
 	};
@@ -91,6 +96,7 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 				<span className={`checkout-step ${step === 1 ? 'is-active' : ''}`}>1. Compte / invité</span>
 				<span className={`checkout-step ${step === 2 ? 'is-active' : ''}`}>2. Facturation</span>
 				<span className={`checkout-step ${step === 3 ? 'is-active' : ''}`}>3. Paiement</span>
+				<span className={`checkout-step ${step === 4 ? 'is-active' : ''}`}>4. Confirmation</span>
 			</div>
 
 			{cartItems.length === 0 ? <div className="notice notice--warning">Votre panier est vide. Ajoutez des produits avant de passer au checkout.</div> : null}
@@ -172,11 +178,53 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 				</div>
 			) : null}
 
+			{step === 4 ? (
+				<div className="stack">
+					<h3>Récapitulatif de votre commande</h3>
+
+					<article className="panel stack">
+						<h4>Produits commandés</h4>
+						{cartItems.map((item) => (
+							<div key={item.productId} className="inline-actions">
+								<span><strong>{item.product.name}</strong> × {item.quantity}</span>
+								<span>{formatPrice(item.lineTotalCents)}</span>
+							</div>
+						))}
+						<hr />
+						<p>Sous-total : {formatPrice(summary.subtotalCents)}</p>
+						<p>Taxes : {formatPrice(summary.taxCents)}</p>
+						<p>Promotion : -{formatPrice(summary.promotionCents)}</p>
+						<p><strong>Total TTC : {formatPrice(summary.totalCents)}</strong></p>
+					</article>
+
+					<article className="panel stack">
+						<h4>Adresse de facturation</h4>
+						<p>{address.firstName} {address.lastName}</p>
+						<p>{address.address1}{address.address2 ? `, ${address.address2}` : ''}</p>
+						<p>{address.postalCode} {address.city} — {address.region}</p>
+						<p>{address.country}</p>
+						<p>Tél. : {address.phone}</p>
+					</article>
+
+					<article className="panel">
+						<h4>Paiement</h4>
+						<p>{payment.cardholderName} — •••• •••• •••• {payment.cardNumber.slice(-4)}</p>
+						<p>Exp. : {payment.expiry}</p>
+					</article>
+				</div>
+			) : null}
+
 			<div className="checkout-actions">
 				<button type="button" className="btn btn--secondary" onClick={() => (step === 1 ? onNavigate('/cart') : setStep(step - 1))}>Retour</button>
-				<button type="button" className="btn btn--primary" disabled={!cartIsReady || (!session.isAuthenticated && !guestMode)} onClick={nextStep}>
-					{step < 3 ? 'Continuer' : 'Confirmer achat'}
-				</button>
+				{step < 4 ? (
+					<button type="button" className="btn btn--primary" disabled={!cartIsReady || (!session.isAuthenticated && !guestMode)} onClick={nextStep}>
+						Continuer
+					</button>
+				) : (
+					<button type="button" className="btn btn--primary" disabled={!cartIsReady} onClick={handlePlaceOrder}>
+						Confirmer l'achat
+					</button>
+				)}
 			</div>
 		</section>
 	);

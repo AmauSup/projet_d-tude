@@ -60,11 +60,11 @@ export default function Home({
 							<p>{product.shortDescription}</p>
 							<p className="home-price">{formatPrice(product.priceCents)}</p>
 							<div className="inline-actions">
-								<button className="btn btn--secondary" type="button" onClick={() => onOpenProduct(product.slug)}>
+								<span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
+									{product.availableStock > 0 ? 'En stock' : 'Rupture de stock'}
+								</span>
+								<button className="btn btn--primary" type="button" onClick={() => onOpenProduct(product.slug)}>
 									Voir la fiche
-								</button>
-								<button className="btn btn--primary" type="button" onClick={() => onNavigate('/checkout')}>
-									Aller au checkout
 								</button>
 							</div>
 						</article>

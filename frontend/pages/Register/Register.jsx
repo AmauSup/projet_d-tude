@@ -1,0 +1,61 @@
+import React, { useState } from 'react';
+import './Register.css';
+
+export default function Register({ onRegister, onNavigate }) {
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    company: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (form.password !== form.confirmPassword) {
+      setMessage('Les mots de passe doivent correspondre.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    const result = await onRegister(form);
+    setMessage(result.message);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      onNavigate('/account');
+    }
+  };
+
+  return (
+    <section className="page auth-page">
+      <header className="page__header">
+        <h1 className="page__title">Creer un compte</h1>
+        <p className="page__subtitle">Creez votre compte professionnel pour suivre commandes, factures et adresses.</p>
+      </header>
+
+      <div className="form-grid">
+        <input className="input" placeholder="Prenom" value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
+        <input className="input" placeholder="Nom" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
+        <input className="input" placeholder="Adresse e-mail professionnelle" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <input className="input" placeholder="Societe" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
+        <input className="input" type="password" placeholder="Mot de passe" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+        <input className="input" type="password" placeholder="Confirmer le mot de passe" value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} />
+      </div>
+
+      <div className="notice notice--info">
+        Validation prevue cote client et cote serveur. Regles : 8 caracteres min., majuscule, minuscule, chiffre, caractere special.
+      </div>
+      {message ? <div className={`notice ${message.toLowerCase().includes('cree') ? 'notice--success' : 'notice--warning'}`}>{message}</div> : null}
+
+      <div className="page-actions">
+        <button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/login')}>J ai deja un compte</button>
+        <button className="btn btn--primary auth-action" type="button" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? 'Inscription...' : "S'inscrire"}
+        </button>
+      </div>
+    </section>
+  );
+}

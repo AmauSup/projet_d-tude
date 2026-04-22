@@ -1,0 +1,69 @@
+import React from 'react';
+import './Cart.css';
+import { formatPrice } from '../../utils/storefront.js';
+
+export default function Cart({ items = [], summary, isAuthenticated, onUpdateQuantity, onRemoveItem, onNavigate }) {
+	return (
+		<section className="page cart-page">
+			<header className="page__header">
+				<h1 className="page__title">Mon panier</h1>
+				<p className="page__subtitle">Accessible invité ou connecté. Vérifiez quantités, disponibilité et total TTC.</p>
+			</header>
+
+			<div className="cart-layout">
+				<div className="cart-list">
+					{items.map((item) => (
+						<article className="cart-item" key={item.productId}>
+							<div className="cart-item__img" />
+							<div>
+								<h3>{item.product.name}</h3>
+								<p>Prix unitaire : {formatPrice(item.product.priceCents)}</p>
+								<p>
+									Statut : {item.isUnavailable ? 'Indisponible' : `${item.product.availableStock} en stock`} • Total : {formatPrice(item.lineTotalCents)}
+								</p>
+								<div className="cart-item__actions">
+									<input
+										className="input cart-item__qty"
+										type="number"
+										min="0"
+										value={item.quantity}
+										onChange={(event) => onUpdateQuantity(item.productId, Number(event.target.value))}
+									/>
+									<button className="btn btn--secondary" type="button" onClick={() => onRemoveItem(item.productId)}>
+										Supprimer
+									</button>
+								</div>
+							</div>
+							<strong>{formatPrice(item.lineTotalCents)}</strong>
+						</article>
+					))}
+					{items.length === 0 ? <div className="notice notice--warning">Votre panier est vide.</div> : null}
+				</div>
+
+				<aside className="cart-summary">
+					<h3>Total commande</h3>
+					<p>Sous-total : {formatPrice(summary.subtotalCents)}</p>
+					<p>Taxes : {formatPrice(summary.taxCents)}</p>
+					<p>Promotion : -{formatPrice(summary.promotionCents)}</p>
+					<hr />
+					<p><strong>Total TTC : {formatPrice(summary.totalCents)}</strong></p>
+					<button className="btn btn--primary" type="button" disabled={items.length === 0 || summary.unavailableCount > 0} onClick={() => onNavigate('/checkout')}>
+						Passer à la caisse
+					</button>
+					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/catalog')}>
+						Continuer mes achats
+					</button>
+				</aside>
+			</div>
+
+			<div className="cart-login-hint">
+				<strong>Conseil :</strong> {isAuthenticated ? 'Votre panier est rattaché à votre compte.' : 'Connectez-vous ou créez un compte pour sauvegarder votre panier avant paiement.'}
+			</div>
+			{summary.unavailableCount > 0 ? (
+				<div className="cart-login-hint">
+					<strong>Info stock :</strong> Les produits indisponibles doivent être retirés ou remplacés avant de continuer.
+				</div>
+			) : null}
+		</section>
+	);
+}

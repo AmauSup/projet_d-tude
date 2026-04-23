@@ -1,6 +1,9 @@
 const express = require('express');
+
+// Connexion PostgreSQL (Neon)
+require('dotenv').config();
+const pool = require('./db');
 const apiRouter = require('./routes');
-const { ensureDbFile } = require('./data/store');
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -40,13 +43,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: err.message || 'Erreur serveur' });
 });
 
-async function start() {
-  await ensureDbFile();
-  app.listen(PORT, () => {
-    console.log(`API Express running on http://localhost:${PORT}`);
-  });
-}
-
-start();
+app.listen(PORT, () => {
+  console.log(`API Express running on http://localhost:${PORT}`);
+});
 
 module.exports = app;

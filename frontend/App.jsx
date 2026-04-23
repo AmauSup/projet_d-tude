@@ -46,25 +46,17 @@ import {
   buildCartDetails,
   buildRelatedProducts,
   computeCartSummary,
-<<<<<<< HEAD
-=======
-  createOrderId,
->>>>>>> origin/main
   formatPrice,
   searchProducts,
   sortProductsForCategory,
 } from './utils/storefront.js';
-<<<<<<< HEAD
 import { storefrontService } from './services/storefrontService.js';
 import { authService } from './services/authService.js';
 import { accountService } from './services/accountService.js';
 import { orderService } from './services/orderService.js';
-import { checkoutService } from './services/checkoutService.js';
-import { adminService } from './services/adminService.js';
 import { getStoredAuthToken, persistAuthToken } from './services/apiClient.js';
-=======
+
 import { adminService } from './services/adminService.js';
->>>>>>> origin/main
 import { useI18n } from './contexts/I18nContext.jsx';
 
 const initialSearchState = {
@@ -125,7 +117,6 @@ export default function App() {
   const [orders, setOrders] = useLocalStorage('althea-orders', initialOrders);
   const [lastOrderId, setLastOrderId] = useLocalStorage('althea-last-order-id', initialOrders[0]?.id ?? null);
   const [searchState, setSearchState] = useLocalStorage('althea-search-state', initialSearchState);
-<<<<<<< HEAD
   const [authToken, setAuthToken] = useLocalStorage('althea-auth-token', getStoredAuthToken());
   const [adminStats, setAdminStats] = useState({ products: products.length, orders: orders.length, revenue: 0 });
 
@@ -158,10 +149,7 @@ export default function App() {
     }
   }, [authToken, session.isAuthenticated, setSession]);
 
-=======
-  const [adminStats, setAdminStats] = useState({ products: products.length, orders: orders.length, revenue: 0 });
 
->>>>>>> origin/main
   useEffect(() => {
     if (location.pathname === '/search') {
       const queryInHash = searchParams.get('q') || '';
@@ -172,7 +160,6 @@ export default function App() {
   }, [location.pathname, searchParams, searchState.query, setSearchState]);
 
   useEffect(() => {
-<<<<<<< HEAD
     if (!session.isAuthenticated || !authToken) {
       return undefined;
     }
@@ -212,9 +199,6 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-=======
-    let mounted = true;
->>>>>>> origin/main
     adminService.getStats({ products, orders }).then((stats) => {
       if (mounted) {
         setAdminStats(stats);
@@ -265,11 +249,7 @@ export default function App() {
   const cartSummary = useMemo(() => computeCartSummary(cartDetails), [cartDetails]);
   const currentOrder = orders.find((order) => order.id === (searchParams.get('order') || lastOrderId)) || orders[0] || null;
 
-<<<<<<< HEAD
-=======
-  const isAdmin = session.role === 'admin';
 
->>>>>>> origin/main
   const navigate = (path, params = {}) => {
     const nextParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -285,10 +265,7 @@ export default function App() {
   };
 
   const handleCategoryNavigation = (categorySlug) => navigate(`/category/${categorySlug}`);
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
   const handleProductNavigation = (productSlug) => navigate(`/product/${productSlug}`);
 
   const handleHeaderSearch = (query) => {
@@ -325,16 +302,11 @@ export default function App() {
     setCartItems((previous) => previous.filter((item) => item.productId !== productId));
   };
 
-<<<<<<< HEAD
   const handleLogin = async ({ email, password }) => {
-=======
-  const handleLogin = ({ email, password }) => {
->>>>>>> origin/main
     if (!email || !password) {
       return { success: false, message: 'Veuillez renseigner votre e-mail et votre mot de passe.' };
     }
 
-<<<<<<< HEAD
     try {
       const result = await authService.login({ email, password });
       persistAuthToken(result.token);
@@ -353,33 +325,14 @@ export default function App() {
 
   const handleRegister = async ({ firstName, lastName, email, password, company }) => {
     if (!firstName || !lastName || !email) {
-      return { success: false, message: 'Tous les champs obligatoires doivent etre completes.' };
-=======
-    if (password.length < 8) {
-      return { success: false, message: 'Mot de passe incorrect. Pensez à utiliser le lien “mot de passe oublié”.' };
-    }
-
-    const role = email.includes('admin') ? 'admin' : 'customer';
-    setSession({ isAuthenticated: true, role });
-    setUserProfile((previous) => ({ ...previous, email }));
-
-    return { success: true, message: 'Connexion réussie.' };
-  };
-
-  const handleRegister = ({ firstName, lastName, email, password, company }) => {
-    if (!firstName || !lastName || !email) {
       return { success: false, message: 'Tous les champs obligatoires doivent être complétés.' };
->>>>>>> origin/main
     }
-
     if (!getPasswordValidation(password)) {
       return {
         success: false,
-<<<<<<< HEAD
-        message: 'Le mot de passe doit contenir 8 caracteres, une majuscule, une minuscule, un chiffre et un caractere special.',
+        message: 'Le mot de passe doit contenir 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
       };
     }
-
     try {
       const result = await authService.register({
         firstName,
@@ -393,10 +346,9 @@ export default function App() {
       setSession({ isAuthenticated: true, role: result.userRole });
       setUserProfile((previous) => ({ ...previous, ...result.user }));
       setOrders([]);
-
       return {
         success: true,
-        message: 'Compte cree. Verification e-mail a connecter ensuite si besoin.',
+        message: 'Compte créé. Vérification e-mail à connecter ensuite si besoin.',
       };
     } catch (error) {
       return {
@@ -417,7 +369,6 @@ export default function App() {
         }),
         accountService.updateAddresses(nextProfile.addresses || []),
       ]);
-
       setUserProfile((previous) => ({
         ...previous,
         ...updatedUserFromProfile,
@@ -425,109 +376,6 @@ export default function App() {
       }));
     } catch (error) {
       console.error(error);
-    }
-  };
-
-  const handlePlaceOrder = async ({ billingAddress, paymentDetails }) => {
-=======
-        message: 'Le mot de passe doit contenir 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
-      };
-    }
-
-    setUserProfile((previous) => ({
-      ...previous,
-      firstName,
-      lastName,
-      email,
-      company,
-      verified: false,
-    }));
-    setSession({ isAuthenticated: true, role: 'customer' });
-
-    return {
-      success: true,
-      message: 'Compte créé. La confirmation e-mail sera à brancher côté backend.',
-    };
-  };
-
-  const handleSaveAccount = (nextProfile) => {
-    setUserProfile((previous) => ({
-      ...previous,
-      ...nextProfile,
-    }));
-  };
-
-  const handlePlaceOrder = ({ billingAddress, paymentDetails }) => {
-    if (cartSummary.unavailableCount > 0) {
-      return { success: false, message: 'Retirez les produits indisponibles avant validation.' };
-    }
-
->>>>>>> origin/main
-    if (cartDetails.length === 0) {
-      return { success: false, message: 'Votre panier est vide.' };
-    }
-
-<<<<<<< HEAD
-    try {
-      const validation = await checkoutService.validateBeforePayment({
-        hasUnavailableItems: cartSummary.unavailableCount > 0,
-        hasItems: cartDetails.length > 0,
-      });
-
-      if (!validation.valid) {
-        return { success: false, message: validation.message };
-      }
-
-      await checkoutService.createPaymentIntent();
-
-      const createdOrder = await orderService.create({
-        billingAddress,
-        paymentDetails,
-        items: cartDetails.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
-      });
-
-      setOrders((previous) => [createdOrder, ...previous.filter((order) => order.id !== createdOrder.id)]);
-      setLastOrderId(createdOrder.id);
-      setCartItems([]);
-      setProducts((previous) =>
-        previous.map((product) => {
-          const orderedItem = cartDetails.find((item) => item.productId === product.id);
-          if (!orderedItem) {
-            return product;
-          }
-
-          return {
-            ...product,
-            availableStock: Math.max(0, product.availableStock - orderedItem.quantity),
-          };
-        }),
-      );
-      setUserProfile((previous) => ({
-        ...previous,
-        addresses: previous.addresses?.length ? previous.addresses : [billingAddress],
-        paymentMethods: previous.paymentMethods?.length
-          ? previous.paymentMethods
-          : [
-              {
-                id: `pm-${Date.now()}`,
-                label: 'Carte enregistree',
-                cardholderName: paymentDetails.cardholderName,
-                last4: paymentDetails.cardNumber.slice(-4),
-                expiry: paymentDetails.expiry,
-              },
-            ],
-      }));
-
-      navigate('/confirmation', { order: createdOrder.id });
-      return { success: true, message: 'Commande validee.' };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message || 'La commande n a pas pu etre enregistree.',
-      };
     }
   };
 
@@ -551,114 +399,11 @@ export default function App() {
 
     persistAuthToken('');
     setAuthToken('');
-=======
-    const nextOrder = {
-      id: createOrderId(),
-      createdAt: new Date().toISOString().slice(0, 10),
-      status: 'À confirmer côté paiement',
-      totalCents: cartSummary.totalCents,
-      items: cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-      billingAddress,
-      paymentSummary: `${paymentDetails.cardholderName} •••• ${paymentDetails.cardNumber.slice(-4)}`,
-    };
 
-    setOrders((previous) => [nextOrder, ...previous]);
-    setLastOrderId(nextOrder.id);
-    setCartItems([]);
-    setUserProfile((previous) => ({
-      ...previous,
-      addresses: previous.addresses?.length ? previous.addresses : [billingAddress],
-      paymentMethods: previous.paymentMethods?.length
-        ? previous.paymentMethods
-        : [
-            {
-              id: `pm-${Date.now()}`,
-              label: 'Carte enregistrée',
-              cardholderName: paymentDetails.cardholderName,
-              last4: paymentDetails.cardNumber.slice(-4),
-              expiry: paymentDetails.expiry,
-            },
-          ],
-    }));
-
-    navigate('/confirmation', { order: nextOrder.id });
-    return { success: true, message: 'Commande validée.' };
-  };
-
-  const handleUpdateOrderStatus = (orderId, status) => {
-    setOrders((previous) =>
-      previous.map((order) => (order.id === orderId ? { ...order, status } : order)),
-    );
-  };
-
-  const handleLogout = () => {
->>>>>>> origin/main
     setSession({ isAuthenticated: false, role: 'guest' });
     navigate('/');
   };
 
-<<<<<<< HEAD
-  const handleMoveCarouselSlide = async (slideId, direction) => {
-    try {
-      const updatedHomeContent = await adminService.moveCarouselSlide(slideId, direction);
-      setHomeContent(updatedHomeContent);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleToggleProductPriority = async (productId) => {
-    try {
-      const updatedProduct = await adminService.toggleProductPriority(productId);
-      setProducts((previous) =>
-        previous.map((product) => (product.id === productId ? updatedProduct : product)),
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleToggleProductAvailability = async (productId) => {
-    try {
-      const updatedProduct = await adminService.toggleProductAvailability(productId);
-      setProducts((previous) =>
-        previous.map((product) => (product.id === productId ? updatedProduct : product)),
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleToggleFeatured = async (productId) => {
-    try {
-      const updatedProduct = await adminService.toggleFeatured(productId);
-      setProducts((previous) =>
-        previous.map((product) => (product.id === productId ? updatedProduct : product)),
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleSetCategoryOrder = async (categoryId, displayOrder) => {
-    try {
-      const updatedCategory = await adminService.updateCategoryOrder(categoryId, Number(displayOrder));
-      setCategories((previous) =>
-        previous.map((category) => (category.id === categoryId ? updatedCategory : category)),
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleUpdateHomeMessage = async (fixedMessage) => {
-    try {
-      const updatedHomeContent = await adminService.updateHomeMessage(fixedMessage);
-      setHomeContent(updatedHomeContent);
-    } catch (error) {
-      console.error(error);
-    }
-=======
   const handleMoveCarouselSlide = (slideId, direction) => {
     setHomeContent((previous) => {
       const slides = [...previous.carousel];
@@ -716,7 +461,6 @@ export default function App() {
 
   const handleUpdateHomeMessage = (fixedMessage) => {
     setHomeContent((previous) => ({ ...previous, fixedMessage }));
->>>>>>> origin/main
   };
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -736,11 +480,7 @@ export default function App() {
         ? [
             { label: 'Mon compte', path: '/account' },
             { label: 'Mes commandes', path: '/orders' },
-<<<<<<< HEAD
-            { label: 'Deconnexion', path: '/logout' },
-=======
             { label: 'Déconnexion', path: '/logout' },
->>>>>>> origin/main
           ]
         : [],
     [session.isAuthenticated],
@@ -773,11 +513,7 @@ export default function App() {
         <Routes>
           <Route
             path="/"
-<<<<<<< HEAD
-            element={(
-=======
             element={
->>>>>>> origin/main
               <Home
                 homeContent={homeContent}
                 categories={sortedCategories}
@@ -786,20 +522,12 @@ export default function App() {
                 onOpenProduct={handleProductNavigation}
                 onNavigate={navigate}
               />
-<<<<<<< HEAD
-            )}
-=======
             }
->>>>>>> origin/main
           />
 
           <Route
             path="/catalog"
-<<<<<<< HEAD
-            element={(
-=======
             element={
->>>>>>> origin/main
               <Category
                 categories={sortedCategories}
                 activeCategory={activeCategory}
@@ -807,19 +535,11 @@ export default function App() {
                 onSelectCategory={handleCategoryNavigation}
                 onOpenProduct={handleProductNavigation}
               />
-<<<<<<< HEAD
-            )}
-          />
-          <Route
-            path="/category/:slug"
-            element={(
-=======
             }
           />
           <Route
             path="/category/:slug"
             element={
->>>>>>> origin/main
               <Category
                 categories={sortedCategories}
                 activeCategory={activeCategory}
@@ -827,19 +547,11 @@ export default function App() {
                 onSelectCategory={handleCategoryNavigation}
                 onOpenProduct={handleProductNavigation}
               />
-<<<<<<< HEAD
-            )}
-          />
-          <Route
-            path="/product/:slug"
-            element={(
-=======
             }
           />
           <Route
             path="/product/:slug"
             element={
->>>>>>> origin/main
               <Product
                 product={selectedProduct}
                 relatedProducts={relatedProducts}
@@ -850,19 +562,11 @@ export default function App() {
                 }}
                 onOpenProduct={handleProductNavigation}
               />
-<<<<<<< HEAD
-            )}
-          />
-          <Route
-            path="/search"
-            element={(
-=======
             }
           />
           <Route
             path="/search"
             element={
->>>>>>> origin/main
               <Search
                 categories={sortedCategories}
                 criteria={searchState}
@@ -870,19 +574,11 @@ export default function App() {
                 results={searchResults}
                 onOpenProduct={handleProductNavigation}
               />
-<<<<<<< HEAD
-            )}
-          />
-          <Route
-            path="/cart"
-            element={(
-=======
             }
           />
           <Route
             path="/cart"
             element={
->>>>>>> origin/main
               <Cart
                 items={cartDetails}
                 summary={cartSummary}
@@ -891,19 +587,11 @@ export default function App() {
                 onRemoveItem={handleRemoveCartItem}
                 onNavigate={navigate}
               />
-<<<<<<< HEAD
-            )}
-          />
-          <Route
-            path="/checkout"
-            element={(
-=======
             }
           />
           <Route
             path="/checkout"
             element={
->>>>>>> origin/main
               <Checkout
                 cartItems={cartDetails}
                 summary={cartSummary}
@@ -914,11 +602,7 @@ export default function App() {
                 onRegister={handleRegister}
                 onPlaceOrder={handlePlaceOrder}
               />
-<<<<<<< HEAD
-            )}
-=======
             }
->>>>>>> origin/main
           />
           <Route path="/confirmation" element={<Confirmation order={currentOrder} products={products} onNavigate={navigate} />} />
           <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={navigate} />} />
@@ -927,37 +611,6 @@ export default function App() {
 
           <Route
             path="/account"
-<<<<<<< HEAD
-            element={(
-              <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <Account user={userProfile} session={session} orders={orders} onSave={handleSaveAccount} onNavigate={navigate} />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/account/settings"
-            element={(
-              <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <AccountSettings onNavigate={navigate} />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/account/addresses"
-            element={(
-              <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <AccountAddresses user={userProfile} onNavigate={navigate} />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/account/payments"
-            element={(
-              <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <AccountPayments user={userProfile} onNavigate={navigate} />
-              </RequireAuth>
-            )}
-=======
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
                 <Account user={userProfile} session={session} orders={orders} onSave={handleSaveAccount} onNavigate={navigate} />
@@ -987,24 +640,15 @@ export default function App() {
                 <AccountPayments user={userProfile} onNavigate={navigate} />
               </RequireAuth>
             }
->>>>>>> origin/main
           />
 
           <Route
             path="/orders"
-<<<<<<< HEAD
-            element={(
-              <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <OrderHistory orders={orders} products={products} onNavigate={navigate} />
-              </RequireAuth>
-            )}
-=======
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
                 <OrderHistory orders={orders} products={products} onNavigate={navigate} />
               </RequireAuth>
             }
->>>>>>> origin/main
           />
           <Route path="/contact" element={<Contact onNavigate={navigate} />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -1013,19 +657,11 @@ export default function App() {
 
           <Route
             path="/admin"
-<<<<<<< HEAD
-            element={(
-              <RequireAdmin isAuthenticated={session.isAuthenticated} isAdmin={isAdmin}>
-                <AdminLayout />
-              </RequireAdmin>
-            )}
-=======
             element={
               <RequireAdmin isAuthenticated={session.isAuthenticated} isAdmin={isAdmin}>
                 <AdminLayout />
               </RequireAdmin>
             }
->>>>>>> origin/main
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard stats={formattedAdminStats} />} />
@@ -1034,11 +670,7 @@ export default function App() {
             <Route path="orders" element={<AdminOrders orders={orders} products={products} onUpdateOrderStatus={handleUpdateOrderStatus} />} />
             <Route
               path="content/home"
-<<<<<<< HEAD
-              element={(
-=======
               element={
->>>>>>> origin/main
                 <Admin
                   homeContent={homeContent}
                   categories={sortedCategories}
@@ -1052,11 +684,7 @@ export default function App() {
                   onSetCategoryOrder={handleSetCategoryOrder}
                   onOpenProduct={handleProductNavigation}
                 />
-<<<<<<< HEAD
-              )}
-=======
               }
->>>>>>> origin/main
             />
             <Route path="support" element={<AdminSupport />} />
             <Route path="*" element={<NotFound />} />

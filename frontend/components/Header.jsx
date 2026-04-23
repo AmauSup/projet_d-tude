@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-<<<<<<< HEAD
-=======
 import PropTypes from 'prop-types';
 Header.propTypes = {
 	navItems: PropTypes.arrayOf(
@@ -25,7 +23,6 @@ Header.propTypes = {
 	onLogout: PropTypes.func,
 	showRegisterAction: PropTypes.bool,
 };
->>>>>>> origin/main
 import './Header.css';
 import { useI18n } from '../contexts/I18nContext.jsx';
 
@@ -59,7 +56,6 @@ export default function Header({
 		onSearchSubmit(query.trim());
 	};
 
-<<<<<<< HEAD
 	return (
 		<header className="site-header">
 			<div className="site-header__container">
@@ -147,7 +143,6 @@ export default function Header({
 		</header>
 	);
 }
-=======
 	       return (
 		       <header className="site-header">
 			       <div className="site-header__container">
@@ -227,5 +222,4 @@ export default function Header({
 			       </div>
 		       </header>
 	       );
-	}
->>>>>>> origin/main
+	

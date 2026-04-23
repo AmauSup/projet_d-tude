@@ -1,10 +1,14 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const supportService = {
-  createContactMessage(payload) {
-    return apiClient.post('/support/contact', payload);
+  async createContactMessage(payload) {
+    await wait();
+    // Backend hook: POST /support/contact
+    return { success: true, id: `msg-${Date.now()}`, payload };
   },
-  sendChatMessage(message) {
-    return apiClient.post('/support/chat', { message });
+  async sendChatMessage(message) {
+    await wait();
+    // Backend hook: POST /support/chat
+    return { reply: `Réponse mockée: ${message}` };
   },
 };

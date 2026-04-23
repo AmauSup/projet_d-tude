@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { apiClient } from './apiClient.js';
 
 export const adminService = {
@@ -44,5 +45,18 @@ export const adminService = {
   async moveCarouselSlide(slideId, direction) {
     const payload = await apiClient.patch('/content/home/carousel/reorder', { slideId, direction });
     return payload.homeContent;
+=======
+const wait = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const adminService = {
+  async getStats({ products, orders }) {
+    await wait();
+    // Backend hook: GET /admin/stats
+    return {
+      products: products.length,
+      orders: orders.length,
+      revenue: orders.reduce((sum, order) => sum + order.totalCents, 0),
+    };
+>>>>>>> origin/main
   },
 };

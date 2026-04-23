@@ -1,16 +1,24 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const authService = {
-  login(credentials) {
-    return apiClient.post('/auth/login', credentials);
+  async login(credentials) {
+    await wait();
+    // Backend hook: POST /auth/login
+    return { success: true, token: 'mock-token', userRole: credentials.email?.includes('admin') ? 'admin' : 'customer' };
   },
-  register(payload) {
-    return apiClient.post('/auth/register', payload);
+  async register(payload) {
+    await wait();
+    // Backend hook: POST /auth/register + email verification workflow
+    return { success: true, requiresEmailVerification: true, payload };
   },
-  forgotPassword(email) {
-    return apiClient.post('/auth/forgot-password', { email });
+  async forgotPassword(email) {
+    await wait();
+    // Backend hook: POST /auth/forgot-password
+    return { success: true, email };
   },
-  logout() {
-    return apiClient.post('/auth/logout', {});
+  async logout() {
+    await wait();
+    // Backend hook: POST /auth/logout / invalidate token
+    return { success: true };
   },
 };

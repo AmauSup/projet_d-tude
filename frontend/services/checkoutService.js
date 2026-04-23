@@ -1,10 +1,19 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 160) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const checkoutService = {
-  validateBeforePayment(payload) {
-    return apiClient.post('/checkout/validate', payload);
+  async validateBeforePayment({ hasUnavailableItems, hasItems }) {
+    await wait();
+    if (hasUnavailableItems) {
+      return { valid: false, message: 'Retirez les produits indisponibles.' };
+    }
+    if (!hasItems) {
+      return { valid: false, message: 'Panier vide.' };
+    }
+    return { valid: true };
   },
-  createPaymentIntent() {
-    return apiClient.post('/checkout/payment-intent', {});
+  async createPaymentIntent() {
+    await wait();
+    // Backend hook: integrate Stripe/PayPal payment intent
+    return { clientSecret: 'mock-client-secret' };
   },
 };

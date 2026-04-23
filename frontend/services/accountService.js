@@ -1,20 +1,14 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const accountService = {
-  async getProfile() {
-    const payload = await apiClient.get('/account/profile');
-    return payload.user;
-  },
-  async getAddresses() {
-    const payload = await apiClient.get('/account/addresses');
-    return payload.addresses;
-  },
   async updateProfile(profile) {
-    const payload = await apiClient.put('/account/profile', profile);
-    return payload.user;
+    await wait();
+    // Backend hook: PUT /account/profile
+    return profile;
   },
   async updateAddresses(addresses) {
-    const payload = await apiClient.put('/account/addresses', { addresses });
-    return payload.user;
+    await wait();
+    // Backend hook: PUT /account/addresses
+    return addresses;
   },
 };

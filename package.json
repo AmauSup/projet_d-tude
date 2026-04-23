@@ -2,10 +2,13 @@
   "name": "althea-project",
   "private": true,
   "workspaces": [
+    "backend",
     "frontend"
   ],
   "scripts": {
     "dev": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "start:backend": "npm run start --workspace backend",
     "build": "npm run build --workspace frontend",
     "preview": "npm run preview --workspace frontend"
   }

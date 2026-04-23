@@ -1,0 +1,9 @@
+.order-list {
+  display: grid;
+  gap: 14px;
+}
+
+.order-item {
+  border-left: 4px solid #0ea5e9;
+  padding-left: 14px !important;
+}

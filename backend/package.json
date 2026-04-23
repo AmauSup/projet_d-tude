@@ -1,0 +1,9 @@
+{
+  "name": "althea-backend-js",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  }
+}

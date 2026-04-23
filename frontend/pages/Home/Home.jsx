@@ -18,11 +18,7 @@ export default function Home({
 			</header>
 
 			<section className="home-carousel">
-<<<<<<< HEAD
-				{homeContent.carousel.map((slide) => (
-=======
 				{homeContent.carousel.slice(0, 4).map((slide) => (
->>>>>>> origin/main
 					<article className="home-slide" key={slide.id}>
 						<span className="badge">{slide.badge}</span>
 						<h3>{slide.title}</h3>
@@ -41,11 +37,7 @@ export default function Home({
 			<section className="home-section">
 				<h2>Catégories populaires</h2>
 				<div className="card-grid">
-<<<<<<< HEAD
-					{categories.map((category) => (
-=======
 					{categories.slice(0, 4).map((category) => (
->>>>>>> origin/main
 						<article className="card home-card" key={category.id}>
 							<div className="card__image" />
 							<h3>{category.name}</h3>
@@ -61,11 +53,7 @@ export default function Home({
 			<section className="home-section">
 				<h2>Top produits du moment</h2>
 				<div className="card-grid">
-<<<<<<< HEAD
-					{featuredProducts.map((product) => (
-=======
 					{featuredProducts.slice(0, 4).map((product) => (
->>>>>>> origin/main
 						<article className="card home-card" key={product.id}>
 							<div className="card__image" />
 							<h3>{product.name}</h3>

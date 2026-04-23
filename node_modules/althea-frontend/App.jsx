@@ -103,6 +103,55 @@ function RequireAdmin({ isAuthenticated, isAdmin, children }) {
 }
 
 export default function App() {
+    // Fonction manquante pour le checkout
+    const handlePlaceOrder = async ({ billingAddress, paymentDetails }) => {
+      if (cartSummary.unavailableCount > 0) {
+        return { success: false, message: 'Retirez les produits indisponibles avant validation.' };
+      }
+      if (cartDetails.length === 0) {
+        return { success: false, message: 'Votre panier est vide.' };
+      }
+      try {
+        // Ici, on simule la validation et la création de commande (mock)
+        const createdOrder = {
+          id: `order-${Date.now()}`,
+          billingAddress,
+          paymentDetails,
+          items: cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          status: 'confirmed',
+          createdAt: new Date().toISOString(),
+        };
+        setOrders((previous) => [createdOrder, ...previous.filter((order) => order.id !== createdOrder.id)]);
+        setLastOrderId(createdOrder.id);
+        setCartItems([]);
+        setProducts((previous) =>
+          previous.map((product) => {
+            const orderedItem = cartDetails.find((item) => item.productId === product.id);
+            if (!orderedItem) return product;
+            return { ...product, availableStock: Math.max(0, product.availableStock - orderedItem.quantity) };
+          })
+        );
+        setUserProfile((previous) => ({
+          ...previous,
+          addresses: previous.addresses?.length ? previous.addresses : [billingAddress],
+          paymentMethods: previous.paymentMethods?.length
+            ? previous.paymentMethods
+            : [
+                {
+                  id: `pm-${Date.now()}`,
+                  label: 'Carte enregistrée',
+                  cardholderName: paymentDetails.cardholderName,
+                  last4: paymentDetails.cardNumber?.slice(-4) || '',
+                  expiry: paymentDetails.expiry,
+                },
+              ],
+        }));
+        navigate('/confirmation', { order: createdOrder.id });
+        return { success: true, message: 'Commande validée.' };
+      } catch (error) {
+        return { success: false, message: error.message || 'La commande n’a pas pu être enregistrée.' };
+      }
+    };
   const { t } = useI18n();
   const location = useLocation();
   const routerNavigate = useNavigate();

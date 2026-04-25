@@ -7,20 +7,20 @@
 
 .checkout-step {
   padding: 10px 14px;
-  border: 1px solid #cbd5e1;
+  border: 1.5px solid #0ea5e9;
   border-radius: 999px;
-  font-size: 0.85rem;
-  color: #64748b;
-  font-weight: 600;
-  background: #ffffff;
-  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  color: #e0e7ef;
+  font-weight: 700;
+  background: #0a1120;
+  transition: all 0.18s cubic-bezier(.4,0,.2,1);
 }
 
 .checkout-step.is-active {
-  border-color: #0ea5e9;
-  background: linear-gradient(135deg, #e0f2fe 0%, #ecf0ff 100%);
-  color: #0c4a6e;
-  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.15);
+  border-color: #38bdf8;
+  background: linear-gradient(90deg, #0a1120 0%, #0369a1 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px 0 rgba(14, 165, 233, 0.18);
 }
 
 .checkout-actions {

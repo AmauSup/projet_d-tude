@@ -59,37 +59,45 @@ export default function Header({
 		return (
 			<header className="site-header">
 				<div className="site-header__container">
-					<button type="button" className="site-header__brand" onClick={() => onNavigate('/')}> 
-						{t('app.brand')}
-					</button>
-
-					<button
-						type="button"
-						className="site-header__burger"
-						onClick={() => setMenuOpen((previous) => !previous)}
-						aria-expanded={menuOpen}
-						aria-controls="main-navigation"
-					>
-						☰
-					</button>
-
-					<form className="site-header__search" onSubmit={handleSubmit}>
-						<input
-							className="input"
-							type="search"
-							placeholder="Rechercher un produit, une catégorie ou une caractéristique"
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-						/>
-						<button type="submit" className="btn btn--primary">{t('nav.search')}</button>
-					</form>
-
+					<div className="site-header__zone site-header__zone--left">
+						<button type="button" className="site-header__brand" onClick={() => onNavigate('/')}> 
+							<span className="site-header__brand-text">Althea Medical</span>
+						</button>
+					</div>
+					<div className="site-header__zone site-header__zone--center">
+						<form className="site-header__search" onSubmit={handleSubmit} style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+							<input
+								className="input"
+								type="search"
+								placeholder="Rechercher un produit"
+								value={query}
+								onChange={(event) => setQuery(event.target.value)}
+								style={{flex:1,minWidth:0}}
+							/>
+							<button type="submit" className="btn btn--primary site-header__search-btn">{t('nav.search')}</button>
+						</form>
+					</div>
 					<nav id="main-navigation" className={`site-header__nav ${menuOpen ? 'is-open' : ''}`}> 
-						{navItems.map((item) => (
+						<button
+							type="button"
+							className={`site-header__link site-header__link--nav ${currentPath === '/' ? 'is-active' : ''}`}
+							onClick={() => onNavigate('/')}
+						>
+							Accueil
+						</button>
+						
+						<button
+							type="button"
+							className={`site-header__link site-header__link--nav ${currentPath === '/search' ? 'is-active' : ''}`}
+							onClick={() => onNavigate('/search')}
+						>
+							Produits
+						</button>
+						{navItems.filter(item => !['/', '/catalogue', '/search'].includes(item.path)).map((item) => (
 							<button
 								key={item.path}
 								type="button"
-								className={`site-header__link ${currentPath === item.path ? 'is-active' : ''}`}
+								className={`site-header__link site-header__link--nav ${currentPath === item.path ? 'is-active' : ''}`}
 								onClick={() => onNavigate(item.path)}
 							>
 								{item.label}
@@ -97,18 +105,17 @@ export default function Header({
 						))}
 						<div className="site-header__menu-group" aria-label="Menu utilisateur">
 							{userMenuItems.map((item) => (
-								<button key={item.path} type="button" className="site-header__link" onClick={() => onNavigate(item.path)}>
+								<button key={item.path} type="button" className="site-header__link site-header__link--nav" onClick={() => onNavigate(item.path)}>
 									{item.label}
 								</button>
 							))}
 							{isAuthenticated ? (
-								<button type="button" className="site-header__link" onClick={onLogout}>
+								<button type="button" className="site-header__link site-header__link--nav" onClick={onLogout}>
 									{t('nav.logout')}
 								</button>
 							) : null}
 						</div>
 					</nav>
-
 					<div className="site-header__actions">
 						<select
 							className="select site-header__locale"
@@ -119,21 +126,20 @@ export default function Header({
 							<option value="fr">FR</option>
 							<option value="en">EN</option>
 						</select>
-
-						<button type="button" className="site-header__utility" onClick={() => onNavigate('/cart')}>
+						<button type="button" className="site-header__utility site-header__link--nav" onClick={() => onNavigate('/cart')}>
 							Panier
 							{cartCount > 0 ? <span className="site-header__badge">{cartCount}</span> : null}
 						</button>
-						<button type="button" className="site-header__utility" onClick={() => onNavigate('/login')}>
+						<button type="button" className="site-header__utility site-header__link--nav" onClick={() => onNavigate('/login')}>
 							{t('nav.login')}
 						</button>
 						{showRegisterAction && (
-							<button type="button" className="site-header__utility" onClick={() => onNavigate('/register')}>
+							<button type="button" className="site-header__utility site-header__link--nav" onClick={() => onNavigate('/register')}>
 								{t('nav.register')}
 							</button>
 						)}
 						{isAdmin ? (
-							<button type="button" className="site-header__utility" onClick={() => onNavigate('/admin/dashboard')}>
+							<button type="button" className="site-header__utility site-header__link--nav" onClick={() => onNavigate('/admin/dashboard')}>
 								{t('nav.admin')}
 							</button>
 						) : null}

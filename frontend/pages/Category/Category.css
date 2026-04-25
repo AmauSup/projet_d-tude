@@ -22,10 +22,12 @@
 }
 
 .category-filters {
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 18px;
-  background: #f8fafc;
+  border: 1.5px solid #1e293b;
+  border-radius: 16px;
+  padding: 20px 18px;
+  background: linear-gradient(120deg, #0a1120 90%, #0ea5e9 100%);
+  box-shadow: 0 2px 16px 0 rgba(14, 165, 233, 0.10);
+  color: #e0e7ef;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -34,7 +36,7 @@
 
 .category-filters h3 {
   margin-bottom: 12px;
-  color: #0f172a;
+  color: #0ea5e9;
 }
 
 .category-filters label {
@@ -42,7 +44,7 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: #475569;
+  color: #e0e7ef;
   font-size: 0.9rem;
 }
 

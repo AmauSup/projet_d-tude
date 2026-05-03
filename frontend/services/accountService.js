@@ -1,14 +1,11 @@
-const wait = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
+
+import { apiClient } from './apiClient.js';
 
 export const accountService = {
   async updateProfile(profile) {
-    await wait();
-    // Backend hook: PUT /account/profile
-    return profile;
+    return await apiClient.put('/account/profile', profile);
   },
   async updateAddresses(addresses) {
-    await wait();
-    // Backend hook: PUT /account/addresses
-    return addresses;
+    return await apiClient.put('/account/addresses', addresses);
   },
 };

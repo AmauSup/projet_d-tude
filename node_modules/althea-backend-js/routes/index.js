@@ -10,10 +10,26 @@ const productRoutes = require('./productRoutes');
 const storefrontRoutes = require('./storefrontRoutes');
 const supportRoutes = require('./supportRoutes');
 
+
+const pool = require('../db');
 const router = express.Router();
 
-router.get('/health', (req, res) => {
-  res.json({ success: true, status: 'ok' });
+// Test connexion PostgreSQL + insertion user si ?insert=1
+router.get('/health', async (req, res) => {
+  try {
+    if (req.query.insert === '1') {
+      const email = `testuser_${Date.now()}@test.com`;
+      const insert = await pool.query(
+        `INSERT INTO users (last_name, first_name, email, password) VALUES ($1, $2, $3, $4) RETURNING id, email`,
+        ['Test', 'User', email, 'testpass']
+      );
+      return res.json({ success: true, inserted: insert.rows[0] });
+    }
+    const result = await pool.query('SELECT 1 as ok');
+    res.json({ success: true, status: 'ok', db: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 router.use('/account', accountRoutes);

@@ -2,11 +2,11 @@ import { apiClient } from './apiClient.js';
 
 export const storefrontService = {
   async getInitialData() {
-    const payload = await apiClient.get('/storefront');
-    return {
-      homeContent: payload.homeContent,
-      categories: payload.categories,
-      products: payload.products,
-    };
+    return await apiClient.get('/storefront');
+  },
+
+  // Charge tous les produits publics depuis la BDD
+  async getProducts() {
+    return await apiClient.get('/products');
   },
 };

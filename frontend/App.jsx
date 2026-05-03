@@ -34,11 +34,6 @@ import AdminOrders from './pages/Admin/AdminOrders.jsx';
 import AdminSupport from './pages/Admin/AdminSupport.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
 import {
-  initialCart,
-  initialCategories,
-  initialHomeContent,
-  initialOrders,
-  initialProducts,
   initialSession,
   initialUser,
 } from './data/mockData.js';
@@ -157,14 +152,17 @@ export default function App() {
   const routerNavigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [categories, setCategories] = useLocalStorage('althea-categories', initialCategories);
-  const [products, setProducts] = useLocalStorage('althea-products', initialProducts);
-  const [homeContent, setHomeContent] = useLocalStorage('althea-home-content', initialHomeContent);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [homeContent, setHomeContent] = useState({ fixedMessage: '', carousel: [] });
   const [session, setSession] = useLocalStorage('althea-session', initialSession);
+  // DEBUG : log l'état de session à chaque render
+  // eslint-disable-next-line no-console
+  console.log('[App] session:', session);
   const [userProfile, setUserProfile] = useLocalStorage('althea-user-profile', initialUser);
-  const [cartItems, setCartItems] = useLocalStorage('althea-cart', initialCart);
-  const [orders, setOrders] = useLocalStorage('althea-orders', initialOrders);
-  const [lastOrderId, setLastOrderId] = useLocalStorage('althea-last-order-id', initialOrders[0]?.id ?? null);
+  const [cartItems, setCartItems] = useLocalStorage('althea-cart', []);
+  const [orders, setOrders] = useState([]);
+  const [lastOrderId, setLastOrderId] = useState(null);
   const [searchState, setSearchState] = useLocalStorage('althea-search-state', initialSearchState);
   const [authToken, setAuthToken] = useLocalStorage('althea-auth-token', getStoredAuthToken());
   const [adminStats, setAdminStats] = useState({ products: products.length, orders: orders.length, revenue: 0 });
@@ -172,31 +170,72 @@ export default function App() {
   const isAdmin = session.role === 'admin';
 
   const loadStorefrontData = async () => {
-    const storefrontData = await storefrontService.getInitialData();
-    setCategories(storefrontData.categories);
-    setProducts(storefrontData.products);
-    setHomeContent(storefrontData.homeContent);
+    // Charge les produits depuis la BDD (API REST)
+    try {
+      const dbProducts = await storefrontService.getProducts();
+      setProducts(dbProducts || []);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[Storefront] Erreur chargement produits BDD:', e);
+    }
+    // Charge les catégories et homeContent (si tu as une API dédiée, adapte ici)
+    try {
+      const storefrontData = await storefrontService.getInitialData();
+      setCategories(storefrontData.categories || []);
+      setHomeContent(storefrontData.homeContent || { fixedMessage: '', carousel: [] });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[Storefront] Erreur chargement home/catégories:', e);
+    }
   };
 
   useEffect(() => {
     let mounted = true;
 
-    loadStorefrontData().catch(() => {
-      if (!mounted) {
-        return;
+    // Si admin connecté, charger les produits depuis le backend
+    const fetchData = async () => {
+      if (isAdmin && session.isAuthenticated && authToken) {
+        try {
+          const backendProducts = await adminService.listProducts();
+          if (mounted) setProducts(backendProducts);
+          // Charger aussi les commandes admin
+          const backendOrders = await adminService.listOrders();
+          if (mounted) setOrders(backendOrders);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('[Admin] Erreur chargement produits/commandes backend:', e);
+        }
+      } else {
+        // Sinon, charger les données publiques (storefront)
+        await loadStorefrontData();
+        // Charger les commandes utilisateur si connecté
+        if (session.isAuthenticated && authToken) {
+          try {
+            const userOrders = await orderService.list();
+            if (mounted) setOrders(userOrders);
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[User] Erreur chargement commandes:', e);
+          }
+        } else {
+          setOrders([]);
+        }
       }
-    });
-
+    };
+    fetchData();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isAdmin, session.isAuthenticated, authToken]);
 
+  // Met à jour lastOrderId quand les commandes changent
   useEffect(() => {
-    if (session.isAuthenticated && !authToken) {
-      setSession({ isAuthenticated: false, role: 'guest' });
+    if (!lastOrderId && orders.length > 0) {
+      setLastOrderId(orders[0].id);
     }
-  }, [authToken, session.isAuthenticated, setSession]);
+  }, [orders, lastOrderId]);
+
+  // Correction : on ne force plus la déconnexion si le token n'est pas encore à jour
 
 
   useEffect(() => {
@@ -229,8 +268,10 @@ export default function App() {
             setLastOrderId(nextOrders[0].id);
           }
         }
-      } catch {
-        if (mounted) {
+      } catch (err) {
+        // Ne déconnecte que si l'erreur est une 401/403 (auth invalide)
+        const isAuthError = err && (err.status === 401 || err.status === 403 || (err.message && (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('unauthorized'))));
+        if (mounted && isAuthError) {
           persistAuthToken('');
           setAuthToken('');
           setSession({ isAuthenticated: false, role: 'guest' });
@@ -351,7 +392,9 @@ export default function App() {
     setCartItems((previous) => previous.filter((item) => item.productId !== productId));
   };
 
-  const handleLogin = async ({ email, password }) => {
+  const handleLogin = async (params) => {
+    // Ne garder que email et password pour le backend
+    const { email, password } = params;
     if (!email || !password) {
       return { success: false, message: 'Veuillez renseigner votre e-mail et votre mot de passe.' };
     }
@@ -360,10 +403,14 @@ export default function App() {
       const result = await authService.login({ email, password });
       persistAuthToken(result.token);
       setAuthToken(result.token);
-      setSession({ isAuthenticated: true, role: result.userRole });
+      // On force la persistance complète de la session dans le localStorage
+      const newSession = { isAuthenticated: true, role: result.userRole, email: result.user?.email };
+      setSession(newSession);
+      window.localStorage.setItem('althea-session', JSON.stringify(newSession));
       setUserProfile((previous) => ({ ...previous, ...result.user }));
-
-      return { success: true, message: 'Connexion reussie.' };
+      // Redirige vers l'accueil après connexion
+      navigate('/');
+      return { success: true, message: 'Connexion réussie.' };
     } catch (error) {
       return {
         success: false,
@@ -383,12 +430,12 @@ export default function App() {
       };
     }
     try {
+      // Adapter les champs pour le backend
       const result = await authService.register({
-        firstName,
-        lastName,
+        first_name: firstName,
+        last_name: lastName,
         email,
-        password,
-        company,
+        password
       });
       persistAuthToken(result.token);
       setAuthToken(result.token);
@@ -468,36 +515,45 @@ export default function App() {
     });
   };
 
-  const handleToggleProductPriority = (productId) => {
-    setProducts((previous) => {
-      const maxPriority = Math.max(0, ...previous.map((product) => product.priorityRank || 0));
-      return previous.map((product) =>
-        product.id === productId
-          ? { ...product, priorityRank: product.priorityRank > 0 ? 0 : maxPriority + 1 }
-          : product,
-      );
-    });
+  const handleToggleProductPriority = async (productId) => {
+    try {
+      const product = products.find((p) => p.id === productId);
+      if (!product) return;
+      const maxPriority = Math.max(0, ...products.map((p) => p.priorityRank || 0));
+      const nextPriority = product.priorityRank > 0 ? 0 : maxPriority + 1;
+      const updated = await adminService.updateProduct(productId, { ...product, priorityRank: nextPriority });
+      setProducts((prev) => prev.map((p) => p.id === productId ? updated : p));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[Admin] Erreur maj priorité produit:', e);
+    }
   };
 
-  const handleToggleProductAvailability = (productId) => {
-    setProducts((previous) =>
-      previous.map((product) =>
-        product.id === productId
-          ? { ...product, availableStock: product.availableStock > 0 ? 0 : 10 }
-          : product,
-      ),
-    );
+  const handleToggleProductAvailability = async (productId) => {
+    try {
+      const product = products.find((p) => p.id === productId);
+      if (!product) return;
+      const nextStock = product.availableStock > 0 ? 0 : 10;
+      const updated = await adminService.updateProduct(productId, { ...product, availableStock: nextStock });
+      setProducts((prev) => prev.map((p) => p.id === productId ? updated : p));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[Admin] Erreur maj stock produit:', e);
+    }
   };
 
-  const handleToggleFeatured = (productId) => {
-    setProducts((previous) => {
-      const maxFeatured = Math.max(0, ...previous.map((product) => product.featuredRank || 0));
-      return previous.map((product) =>
-        product.id === productId
-          ? { ...product, featuredRank: product.featuredRank > 0 ? 0 : maxFeatured + 1 }
-          : product,
-      );
-    });
+  const handleToggleFeatured = async (productId) => {
+    try {
+      const product = products.find((p) => p.id === productId);
+      if (!product) return;
+      const maxFeatured = Math.max(0, ...products.map((p) => p.featuredRank || 0));
+      const nextFeatured = product.featuredRank > 0 ? 0 : maxFeatured + 1;
+      const updated = await adminService.updateProduct(productId, { ...product, featuredRank: nextFeatured });
+      setProducts((prev) => prev.map((p) => p.id === productId ? updated : p));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[Admin] Erreur maj featured produit:', e);
+    }
   };
 
   const handleSetCategoryOrder = (categoryId, displayOrder) => {
@@ -512,7 +568,7 @@ export default function App() {
     setHomeContent((previous) => ({ ...previous, fixedMessage }));
   };
 
-  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, item) => sum + item.quantity, 0) : 0;
 
   const navItems = useMemo(
     () => [
@@ -523,17 +579,7 @@ export default function App() {
     [t],
   );
 
-  const userMenuItems = useMemo(
-    () =>
-      session.isAuthenticated
-        ? [
-            { label: 'Mon compte', path: '/account' },
-            { label: 'Mes commandes', path: '/orders' },
-            { label: 'Déconnexion', path: '/logout' },
-          ]
-        : [],
-    [session.isAuthenticated],
-  );
+
 
   const formattedAdminStats = {
     ...adminStats,
@@ -549,7 +595,7 @@ export default function App() {
         searchValue={searchState.query}
         isAuthenticated={session.isAuthenticated}
         isAdmin={isAdmin}
-        userMenuItems={userMenuItems}
+        userProfile={userProfile}
         onNavigate={navigate}
         onSearchSubmit={handleHeaderSearch}
         onLogout={handleLogout}

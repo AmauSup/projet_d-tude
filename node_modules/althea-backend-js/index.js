@@ -1,3 +1,7 @@
+// Ajout du routeur principal pour toutes les routes REST
+const routes = require('./routes');
+// Branche toutes les routes REST sur /api
+app.use('/api', routes);
 // --- PRODUITS ---
 // Lister tous les produits (admin)
 app.get('/api/admin/products', authenticateToken, async (req, res) => {

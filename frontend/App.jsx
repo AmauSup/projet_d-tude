@@ -33,10 +33,8 @@ import AdminCategories from './pages/Admin/AdminCategories.jsx';
 import AdminOrders from './pages/Admin/AdminOrders.jsx';
 import AdminSupport from './pages/Admin/AdminSupport.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
-import {
-  initialSession,
-  initialUser,
-} from './data/mockData.js';
+// Suppression de l’import mockData.js : tout l’état initial vient de l’API
+// (mockData.js supprimé, tout vient de l’API)
 import {
   buildCartDetails,
   buildRelatedProducts,
@@ -155,11 +153,11 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [homeContent, setHomeContent] = useState({ fixedMessage: '', carousel: [] });
-  const [session, setSession] = useLocalStorage('althea-session', initialSession);
+  const [session, setSession] = useLocalStorage('althea-session', { isAuthenticated: false, role: 'guest' });
   // DEBUG : log l'état de session à chaque render
   // eslint-disable-next-line no-console
   console.log('[App] session:', session);
-  const [userProfile, setUserProfile] = useLocalStorage('althea-user-profile', initialUser);
+  const [userProfile, setUserProfile] = useLocalStorage('althea-user-profile', null);
   const [cartItems, setCartItems] = useLocalStorage('althea-cart', []);
   const [orders, setOrders] = useState([]);
   const [lastOrderId, setLastOrderId] = useState(null);

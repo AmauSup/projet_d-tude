@@ -13,10 +13,10 @@ function sendAuthResponse(res, user, token, status = 200) {
   });
 }
 
-// Connexion, refuse si email non confirmé
+// Connexion — findUserByCredentials est maintenant async (bcrypt.compare)
 async function login(req, res) {
   const db = await readDb();
-  const user = userAuthService.findUserByCredentials(db.users, req.body.email, req.body.password);
+  const user = await userAuthService.findUserByCredentials(db.users, req.body.email, req.body.password);
 
   if (!user) {
     res.status(401).json({ success: false, message: 'Identifiants invalides' });

@@ -1,24 +1,28 @@
+'use strict';
+
+const bcrypt = require('bcryptjs');
+const crypto = require('node:crypto');
 const { updateDb } = require('../data/store');
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
-function findUserByCredentials(users, email, password) {
+async function findUserByCredentials(users, email, password) {
   const normalizedEmail = normalizeEmail(email);
-
-  return users.find((user) => (
-    normalizeEmail(user.email) === normalizedEmail && user.password === password
-  ));
+  const user = users.find((u) => normalizeEmail(u.email) === normalizedEmail);
+  if (!user) return null;
+  const valid = await bcrypt.compare(password, user.password);
+  return valid ? user : null;
 }
 
 function validatePassword(password) {
   return (
-    String(password || '').length >= 8
-    && /[A-Z]/.test(password)
-    && /[a-z]/.test(password)
-    && /\d/.test(password)
-    && /[^A-Za-z0-9]/.test(password)
+    String(password || '').length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
   );
 }
 
@@ -30,26 +34,28 @@ function validateRegistrationPayload(payload) {
   }
 
   if (!validatePassword(password)) {
-    throw new Error('Le mot de passe doit contenir 8 caracteres, une majuscule, une minuscule, un chiffre et un caractere special.');
+    throw new Error(
+      'Le mot de passe doit contenir 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
+    );
   }
 }
 
-
-// Génère un token simple (à remplacer par crypto si besoin)
 function generateToken() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return crypto.randomBytes(32).toString('hex');
 }
 
 async function createUser(payload) {
+  const passwordHash = await bcrypt.hash(payload.password, 12);
+
   const user = {
     id: `user-${Date.now()}`,
     firstName: String(payload.firstName).trim(),
     lastName: String(payload.lastName).trim(),
     email: normalizeEmail(payload.email),
-    password: payload.password,
+    password: passwordHash,
     phone: '',
     company: String(payload.company || '').trim(),
-    verified: false, // Non vérifié par défaut
+    verified: false,
     emailVerifiedAt: null,
     role: 'customer',
     addresses: [],
@@ -61,7 +67,11 @@ async function createUser(payload) {
   await updateDb((draft) => {
     draft.users.push(user);
     draft.emailTokens = draft.emailTokens || [];
-    draft.emailTokens.push({ userId: user.id, token: emailToken, expires: Date.now() + 1000 * 60 * 60 * 24 });
+    draft.emailTokens.push({
+      userId: user.id,
+      token: emailToken,
+      expires: Date.now() + 1000 * 60 * 60 * 24,
+    });
   });
 
   return { user, emailToken };
@@ -93,6 +103,7 @@ async function createResetPasswordToken(email) {
     const user = draft.users.find((u) => normalizeEmail(u.email) === normalizeEmail(email));
     if (user) {
       userId = user.id;
+      // Expiration 30 minutes
       draft.resetTokens.push({ userId, token, expires: Date.now() + 1000 * 60 * 30 });
     }
   });
@@ -100,16 +111,25 @@ async function createResetPasswordToken(email) {
 }
 
 async function resetPasswordWithToken(token, newPassword) {
+  if (!validatePassword(newPassword)) {
+    throw new Error(
+      'Le nouveau mot de passe doit contenir 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
+    );
+  }
+
   let success = false;
+  const newHash = await bcrypt.hash(newPassword, 12);
+
   await updateDb((draft) => {
     draft.resetTokens = draft.resetTokens || [];
     const entry = draft.resetTokens.find((t) => t.token === token && t.expires > Date.now());
     if (entry) {
       const user = draft.users.find((u) => u.id === entry.userId);
       if (user) {
-        user.password = newPassword;
+        user.password = newHash;
         success = true;
       }
+      // Invalider le token après usage
       draft.resetTokens = draft.resetTokens.filter((t) => t.token !== token);
     }
   });

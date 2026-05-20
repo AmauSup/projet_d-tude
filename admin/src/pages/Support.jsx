@@ -1,39 +1,64 @@
-
-import React, { useState } from 'react';
-import { Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, IconButton, Chip } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, IconButton, Chip, Alert,
+  CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField,
+} from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-// TODO: Connecter à l'API/backend pour charger les tickets/messages
-
-// Données factices pour la maquette
-const fakeTickets = [
-  { id: 1, subject: 'Problème de paiement', status: 'ouvert', user: 'Jean Dupont', created_at: '2026-04-20' },
-  { id: 2, subject: 'Erreur produit', status: 'fermé', user: 'Alice Martin', created_at: '2026-04-22' },
-];
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { apiFetch } from '../contexts/AuthContext';
 
 const statusColors = {
-  ouvert: 'warning',
-  fermé: 'success',
-  en_cours: 'info',
+  open: 'warning',
+  closed: 'success',
+  in_progress: 'info',
 };
 
+const statusLabel = { open: 'Ouvert', closed: 'Fermé', in_progress: 'En cours' };
+
 export default function Support() {
-  const [tickets] = useState(fakeTickets);
-  // TODO: Ajouter gestion modals, filtres, chatbot, actions
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [reply, setReply] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    apiFetch('/pg/admin/messages')
+      .then((data) => setMessages(data.messages || []))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleClose = async (id) => {
+    setSaving(true);
+    try {
+      await apiFetch(`/pg/admin/messages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'closed', admin_reply: reply }),
+      });
+      setSelected(null);
+      setReply('');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ p: 2 }}>
-      <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Grid item>
-          <Typography variant="h4">Centre de support</Typography>
-        </Grid>
-        <Grid item>
-          <Button variant="contained" startIcon={<AddIcon />}>Nouveau ticket</Button>
-        </Grid>
-      </Grid>
+      <Typography variant="h4" sx={{ mb: 2 }}>Centre de support</Typography>
 
-      {/* TODO: Filtres de recherche (statut, utilisateur, date, etc.) */}
-      <Box sx={{ mb: 2, color: '#888' }}>À compléter (filtres de recherche)</Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <TableContainer component={Paper}>
         <Table>
@@ -42,24 +67,38 @@ export default function Support() {
               <TableCell>ID</TableCell>
               <TableCell>Sujet</TableCell>
               <TableCell>Utilisateur</TableCell>
+              <TableCell>Email</TableCell>
               <TableCell>Statut</TableCell>
               <TableCell>Date</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {tickets.map((ticket) => (
-              <TableRow key={ticket.id}>
-                <TableCell>{ticket.id}</TableCell>
-                <TableCell>{ticket.subject}</TableCell>
-                <TableCell>{ticket.user}</TableCell>
-                <TableCell>
-                  <Chip label={ticket.status} color={statusColors[ticket.status] || 'default'} size="small" />
+            {messages.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  <Typography color="text.secondary">Aucun message.</Typography>
                 </TableCell>
-                <TableCell>{ticket.created_at}</TableCell>
+              </TableRow>
+            )}
+            {messages.map((msg) => (
+              <TableRow key={msg.id}>
+                <TableCell>{msg.id}</TableCell>
+                <TableCell>{msg.subject || '—'}</TableCell>
+                <TableCell>
+                  {msg.first_name ? `${msg.first_name} ${msg.last_name}` : '—'}
+                </TableCell>
+                <TableCell>{msg.email || '—'}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={statusLabel[msg.status] || msg.status}
+                    color={statusColors[msg.status] || 'default'}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>{msg.created_at ? String(msg.created_at).slice(0, 10) : '—'}</TableCell>
                 <TableCell align="right">
-                  {/* TODO: Bouton voir détail, actions */}
-                  <IconButton size="small" color="primary">
+                  <IconButton size="small" color="primary" onClick={() => { setSelected(msg); setReply(msg.admin_reply || ''); }}>
                     <VisibilityIcon />
                   </IconButton>
                 </TableCell>
@@ -69,8 +108,42 @@ export default function Support() {
         </Table>
       </TableContainer>
 
-      {/* TODO: Modals pour création/réponse, chatbot, etc. */}
-      <Box sx={{ mt: 2, color: '#888' }}>À compléter (modals, chatbot, réponses)</Box>
+      <Dialog open={!!selected} onClose={() => { setSelected(null); setReply(''); }} maxWidth="sm" fullWidth>
+        {selected && (
+          <>
+            <DialogTitle>Message #{selected.id} — {selected.subject || 'Sans sujet'}</DialogTitle>
+            <DialogContent dividers>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                De : {selected.first_name ? `${selected.first_name} ${selected.last_name}` : '—'} ({selected.email})
+              </Typography>
+              <Typography sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>{selected.message}</Typography>
+              <TextField
+                label="Réponse admin (optionnelle)"
+                multiline
+                rows={4}
+                fullWidth
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                disabled={saving || selected.status === 'closed'}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => { setSelected(null); setReply(''); }}>Fermer</Button>
+              {selected.status !== 'closed' && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                  onClick={() => handleClose(selected.id)}
+                  disabled={saving}
+                >
+                  Clôturer
+                </Button>
+              )}
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 }

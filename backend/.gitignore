@@ -34,6 +34,11 @@ hs_err_pid*
 node_modules/
 data/db.json
 
+# Secrets — NE JAMAIS COMMIT
+.env
+.env.local
+.env.*.local
+
 # Maven
 target/
 .mvn/wrapper/maven-wrapper.jar

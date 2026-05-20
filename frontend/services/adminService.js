@@ -1,85 +1,57 @@
-
-// Récupère le token JWT stocké (adapter selon ton projet)
-function getToken() {
-  return localStorage.getItem('authToken');
-}
+import { apiClient } from './apiClient.js';
 
 export const adminService = {
-  // Statistiques mockées (à remplacer si besoin)
-  async getStats({ products = [], orders = [] } = {}) {
-    return {
-      products: products.length,
-      orders: orders.length,
-      revenue: orders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
-    };
+  async getStats() {
+    const data = await apiClient.get('/pg/admin/stats');
+    return data.stats || data;
   },
 
   // --- PRODUITS ---
   async listProducts() {
-    const res = await fetch('http://localhost:3001/api/admin/products', {
-      headers: { Authorization: 'Bearer ' + getToken() },
-    });
-    if (!res.ok) throw new Error('Erreur chargement produits');
-    return await res.json();
+    const data = await apiClient.get('/pg/admin/products');
+    return data.products || data;
   },
   async createProduct(product) {
-    const res = await fetch('http://localhost:3001/api/admin/products', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + getToken(),
-      },
-      body: JSON.stringify(product),
-    });
-    if (!res.ok) throw new Error('Erreur création produit');
-    return await res.json();
+    const data = await apiClient.post('/pg/admin/products', product);
+    return data.product || data;
   },
   async updateProduct(id, product) {
-    const res = await fetch('http://localhost:3001/api/admin/products/' + id, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + getToken(),
-      },
-      body: JSON.stringify(product),
-    });
-    if (!res.ok) throw new Error('Erreur modification produit');
-    return await res.json();
+    const data = await apiClient.put(`/pg/admin/products/${id}`, product);
+    return data.product || product;
   },
   async deleteProduct(id) {
-    const res = await fetch('http://localhost:3001/api/admin/products/' + id, {
-      method: 'DELETE',
-      headers: { Authorization: 'Bearer ' + getToken() },
-    });
-    if (!res.ok) throw new Error('Erreur suppression produit');
-    return await res.json();
+    return apiClient.patch(`/admin/products/${id}/delete`, {});
   },
 
   // --- COMMANDES ---
   async listOrders() {
-    const res = await fetch('http://localhost:3001/api/admin/orders', {
-      headers: { Authorization: 'Bearer ' + getToken() },
-    });
-    if (!res.ok) throw new Error('Erreur chargement commandes');
-    return await res.json();
+    const data = await apiClient.get('/pg/admin/orders');
+    return data.orders || data;
   },
   async getOrder(id) {
-    const res = await fetch('http://localhost:3001/api/admin/orders/' + id, {
-      headers: { Authorization: 'Bearer ' + getToken() },
-    });
-    if (!res.ok) throw new Error('Erreur chargement commande');
-    return await res.json();
+    const data = await apiClient.get(`/pg/admin/orders/${id}`);
+    return data.order || data;
   },
   async updateOrderStatus(id, status) {
-    const res = await fetch('http://localhost:3001/api/admin/orders/' + id + '/status', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + getToken(),
-      },
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) throw new Error('Erreur maj statut commande');
-    return await res.json();
+    const data = await apiClient.put(`/pg/admin/orders/${id}/status`, { status });
+    return data.order || { id, status };
+  },
+
+  // --- UTILISATEURS ---
+  async listUsers() {
+    const data = await apiClient.get('/pg/admin/users');
+    return data.users || data;
+  },
+  async deleteUser(id) {
+    return apiClient.patch(`/pg/admin/users/${id}/delete`, {});
+  },
+
+  // --- MESSAGES CONTACT ---
+  async listMessages() {
+    const data = await apiClient.get('/pg/admin/messages');
+    return data.messages || data;
+  },
+  async updateMessageStatus(id, status) {
+    return apiClient.patch(`/pg/admin/messages/${id}`, { status });
   },
 };

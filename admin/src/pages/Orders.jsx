@@ -1,57 +1,60 @@
-
-import React, { useState } from 'react';
-import { Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, IconButton, Chip } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Button, Typography, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, IconButton, Chip, Alert,
+  CircularProgress, Select, MenuItem, FormControl,
+} from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { apiFetch } from '../contexts/AuthContext';
 import OrderDetailDialog from '../components/OrderDetailDialog';
 
-// Données factices pour la maquette
-const fakeOrders = [
-  {
-    id: 101,
-    user: 'Jean Dupont',
-    status: 'pending',
-    total_amount: 199.99,
-    created_at: '2026-04-25',
-    payment_method: 'CB',
-  },
-  {
-    id: 102,
-    user: 'Alice Martin',
-    status: 'completed',
-    total_amount: 59.99,
-    created_at: '2026-04-24',
-    payment_method: 'Paypal',
-  },
-];
+const STATUS_OPTIONS = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
 
 const statusColors = {
   pending: 'warning',
+  confirmed: 'info',
   completed: 'success',
   cancelled: 'error',
-  shipped: 'info',
+  shipped: 'primary',
 };
 
 export default function Orders() {
-  const [orders, setOrders] = useState(fakeOrders);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [openDetail, setOpenDetail] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
-  const [openDelete, setOpenDelete] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
 
-  // Suppression commande (mock)
-  const handleDeleteOrder = () => {
-    setOrders((prev) => prev.filter(o => o.id !== deleteId));
-    setOpenDelete(false);
-    setDeleteId(null);
+  useEffect(() => {
+    apiFetch('/pg/admin/orders')
+      .then((data) => setOrders(data.orders || []))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    setUpdatingId(orderId);
+    try {
+      await apiFetch(`/pg/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdatingId(null);
+    }
   };
+
+  if (loading) return <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>Gestion des commandes</Typography>
 
-      {/* TODO: Filtres de recherche (statut, client, date, etc.) */}
-      <Box sx={{ mb: 2, color: '#888' }}>À compléter (filtres de recherche)</Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <TableContainer component={Paper}>
         <Table>
@@ -60,44 +63,52 @@ export default function Orders() {
               <TableCell>ID</TableCell>
               <TableCell>Client</TableCell>
               <TableCell>Statut</TableCell>
-              <TableCell>Méthode paiement</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Date</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
+            {orders.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <Typography color="text.secondary">Aucune commande.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell>{order.id}</TableCell>
-                <TableCell>{order.user}</TableCell>
+                <TableCell>#{order.id}</TableCell>
                 <TableCell>
-                  <Chip label={order.status} color={statusColors[order.status] || 'default'} size="small" />
+                  {order.first_name ? `${order.first_name} ${order.last_name}` : order.email || '—'}
                 </TableCell>
-                <TableCell>{order.payment_method}</TableCell>
-                <TableCell>{order.total_amount} €</TableCell>
-                <TableCell>{order.created_at}</TableCell>
+                <TableCell>
+                  <FormControl size="small" disabled={updatingId === order.id}>
+                    <Select
+                      value={order.status}
+                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                      renderValue={(v) => (
+                        <Chip label={v} color={statusColors[v] || 'default'} size="small" />
+                      )}
+                      sx={{ minWidth: 130 }}
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <MenuItem key={s} value={s}>
+                          <Chip label={s} color={statusColors[s] || 'default'} size="small" />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </TableCell>
+                <TableCell>{Number(order.total_amount).toFixed(2)} €</TableCell>
+                <TableCell>{order.created_at ? String(order.created_at).slice(0, 10) : '—'}</TableCell>
                 <TableCell align="right">
                   <IconButton
                     size="small"
                     color="primary"
-                    sx={{ mr: 1 }}
-                    onClick={() => {
-                      setDetailOrder(order);
-                      setOpenDetail(true);
-                    }}
+                    onClick={() => { setDetailOrder(order); setOpenDetail(true); }}
                   >
                     <VisibilityIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => {
-                      setDeleteId(order.id);
-                      setOpenDelete(true);
-                    }}
-                  >
-                    <DeleteIcon />
                   </IconButton>
                 </TableCell>
               </TableRow>
@@ -106,29 +117,11 @@ export default function Orders() {
         </Table>
       </TableContainer>
 
-      {/* Modale détail commande */}
       <OrderDetailDialog
         open={openDetail}
         onClose={() => { setOpenDetail(false); setDetailOrder(null); }}
         order={detailOrder}
       />
-
-      {/* Modale suppression commande */}
-      {openDelete && (
-        <Paper elevation={6} sx={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', bgcolor: 'rgba(0,0,0,0.3)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Box sx={{ bgcolor: '#fff', p: 4, borderRadius: 2, minWidth: 320 }}>
-            <Typography variant="h6" gutterBottom>Confirmer la suppression</Typography>
-            <Typography>Voulez-vous vraiment supprimer cette commande ?</Typography>
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button onClick={() => { setOpenDelete(false); setDeleteId(null); }}>Annuler</Button>
-              <Button variant="contained" color="error" onClick={handleDeleteOrder}>Supprimer</Button>
-            </Box>
-          </Box>
-        </Paper>
-      )}
-
-      {/* TODO: Modal de détail commande, actions avancées */}
-      <Box sx={{ mt: 2, color: '#888' }}>À compléter (modal détail commande, actions avancées)</Box>
     </Box>
   );
 }

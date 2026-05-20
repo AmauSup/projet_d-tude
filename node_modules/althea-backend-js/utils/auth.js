@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 function createToken() {
   return crypto.randomBytes(24).toString('hex');

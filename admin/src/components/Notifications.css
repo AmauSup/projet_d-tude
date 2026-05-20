@@ -1,0 +1,14 @@
+.notifications-bar {
+  padding: 8px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.notification--success { color: #2e7d32; }
+.notification--error   { color: #c62828; }
+.notification--info    { color: #1565c0; }

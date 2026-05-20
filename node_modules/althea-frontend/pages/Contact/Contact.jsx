@@ -1,5 +1,125 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './Contact.css';
+import { apiClient } from '../../services/apiClient.js';
+
+const FAQ = [
+  {
+    triggers: ['livraison', 'délai', 'expédition', 'recevoir', 'envoi'],
+    answer: 'Nous expédions sous 24 h ouvrées. Les délais de livraison sont de 3 à 7 jours ouvrés selon votre zone. La livraison est gratuite à partir de 50 €.',
+  },
+  {
+    triggers: ['retour', 'rembours', 'renvoyer', 'échange', 'annuler'],
+    answer: 'Vous avez 14 jours après réception pour retourner un article. Contactez-nous par ce formulaire avec votre numéro de commande et nous organisons le retour.',
+  },
+  {
+    triggers: ['commande', 'suivi', 'statut', 'où est'],
+    answer: 'Consultez votre historique de commandes dans votre espace compte. Vous y trouverez le statut en temps réel. Un email de confirmation vous a été envoyé à la validation.',
+  },
+  {
+    triggers: ['stock', 'disponible', 'rupture', 'quand disponible'],
+    answer: 'La disponibilité est affichée sur chaque fiche produit. En cas de rupture, vous pouvez nous contacter pour être alerté à la remise en stock.',
+  },
+  {
+    triggers: ['paiement', 'carte', 'sécuri', 'paypal', 'virement'],
+    answer: 'Nous acceptons les cartes bancaires (Visa, Mastercard) et PayPal. Toutes les transactions sont sécurisées. Nous ne stockons jamais vos données bancaires.',
+  },
+  {
+    triggers: ['mot de passe', 'compte', 'connexion', 'identifiant', 'email'],
+    answer: 'Si vous avez oublié votre mot de passe, utilisez la page « Mot de passe oublié » sur l\'écran de connexion. Un lien de réinitialisation vous sera envoyé par email.',
+  },
+  {
+    triggers: ['garantie', 'sav', 'panne', 'défaut', 'cassé'],
+    answer: 'Nos produits bénéficient d\'une garantie légale de 2 ans. En cas de panne ou de défaut, contactez notre SAV via ce formulaire avec photos et description du problème.',
+  },
+  {
+    triggers: ['facture', 'reçu', 'document'],
+    answer: 'Votre facture est disponible dans votre espace compte, rubrique historique des commandes. Vous pouvez la télécharger en PDF.',
+  },
+];
+
+const SUGGESTIONS = [
+  'Délais de livraison ?',
+  'Faire un retour ?',
+  'Suivre ma commande',
+  'Problème de paiement',
+];
+
+const BOT_INTRO = 'Bonjour ! Je suis l\'assistant Althea. Posez-moi une question sur la livraison, les retours, votre commande ou le SAV.';
+
+function findAnswer(input) {
+  const q = input.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  for (const entry of FAQ) {
+    if (entry.triggers.some((t) => q.includes(t.normalize('NFD').replace(/\p{Diacritic}/gu, '')))) {
+      return entry.answer;
+    }
+  }
+  return 'Je n\'ai pas trouvé de réponse précise à votre question. Utilisez le formulaire ci-contre pour contacter notre équipe qui vous répondra sous 24 h.';
+}
+
+function Chatbot() {
+  const [messages, setMessages] = useState([{ id: 0, role: 'bot', text: BOT_INTRO }]);
+  const [input, setInput] = useState('');
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const send = (text) => {
+    const question = text.trim();
+    if (!question) return;
+    const answer = findAnswer(question);
+    setMessages((prev) => [
+      ...prev,
+      { id: prev.length, role: 'user', text: question },
+      { id: prev.length + 1, role: 'bot', text: answer },
+    ]);
+    setInput('');
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    send(input);
+  };
+
+  return (
+    <aside className="chatbot" aria-label="Assistant virtuel">
+      <div className="chatbot__header">
+        <span className="chatbot__dot" aria-hidden="true" />
+        <h3>Assistant Althea</h3>
+      </div>
+
+      <div className="chatbot__messages" role="log" aria-live="polite">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`chatbot__bubble chatbot__bubble--${msg.role}`}>
+            {msg.text}
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="chatbot__suggestions" aria-label="Questions fréquentes">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} type="button" className="chatbot__suggestion" onClick={() => send(s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <form className="chatbot__form" onSubmit={handleSubmit}>
+        <input
+          className="chatbot__input"
+          type="text"
+          placeholder="Posez votre question…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          aria-label="Votre question"
+        />
+        <button type="submit" className="chatbot__send" aria-label="Envoyer">➤</button>
+      </form>
+    </aside>
+  );
+}
 
 function validateForm(form) {
   const errors = {};
@@ -23,8 +143,10 @@ export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: 'support', message: '' });
   const [errors, setErrors] = useState({});
   const [messageSent, setMessageSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState('');
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = validateForm(form);
 
@@ -34,16 +156,30 @@ export default function Contact() {
     }
 
     setErrors({});
-    setMessageSent(true);
-    // Backend hook: POST /api/support/contact with { name, email, subject, message }
+    setSubmitting(true);
+    setServerError('');
+
+    try {
+      await apiClient.post('/pg/support/contact', {
+        name: form.name,
+        email: form.email,
+        subject: form.subject,
+        message: form.message,
+      });
+      setMessageSent(true);
+    } catch (err) {
+      setServerError(err.message || 'Erreur lors de l\'envoi. Veuillez réessayer.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (messageSent) {
     return (
       <section className="page contact-page">
-        <div className="notice notice--success" role="status">
-          <strong>Message envoyé !</strong> Nous vous répondrons sous 24 h à l'adresse {form.email}.
-        </div>
+        <output className="notice notice--success">
+          <strong>Message envoyé !</strong> Nous vous répondrons sous 24 h à l&apos;adresse {form.email}.
+        </output>
         <div className="page-actions">
           <button
             className="btn btn--secondary"
@@ -133,19 +269,16 @@ export default function Contact() {
             ) : null}
           </div>
 
-          <button className="btn btn--primary" type="submit">Envoyer</button>
+          {serverError ? (
+            <p className="helper-text helper-text--error" role="alert">{serverError}</p>
+          ) : null}
+
+          <button className="btn btn--primary" type="submit" disabled={submitting}>
+            {submitting ? 'Envoi en cours…' : 'Envoyer'}
+          </button>
         </form>
 
-        <aside className="chatbot-placeholder">
-          <h3>Assistance rapide</h3>
-          <p>Notre assistant guide les clients sur produits, commandes et SAV.</p>
-          <div className="stack">
-            <div className="panel">Questions fréquentes : livraison, disponibilité, installation.</div>
-            <div className="panel">
-              <em>Backend hook :</em> branchement prévu à une base FAQ ou à un agent conversationnel.
-            </div>
-          </div>
-        </aside>
+        <Chatbot />
       </div>
     </section>
   );

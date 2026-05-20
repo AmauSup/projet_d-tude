@@ -19,6 +19,7 @@ import OrderHistory from './pages/OrderHistory/OrderHistory.jsx';
 import Contact from './pages/Contact/Contact.jsx';
 import Admin from './pages/Admin/Admin.jsx';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import AccountSettings from './pages/AccountSettings/AccountSettings.jsx';
 import AccountAddresses from './pages/AccountAddresses/AccountAddresses.jsx';
 import AccountPayments from './pages/AccountPayments/AccountPayments.jsx';
@@ -47,7 +48,7 @@ import { storefrontService } from './services/storefrontService.js';
 import { authService } from './services/authService.js';
 import { accountService } from './services/accountService.js';
 import { orderService } from './services/orderService.js';
-import { getStoredAuthToken, persistAuthToken } from './services/apiClient.js';
+import { apiClient, getStoredAuthToken, persistAuthToken } from './services/apiClient.js';
 
 import { adminService } from './services/adminService.js';
 import { useI18n } from './contexts/I18nContext.jsx';
@@ -96,55 +97,6 @@ function RequireAdmin({ isAuthenticated, isAdmin, children }) {
 }
 
 export default function App() {
-    // Fonction manquante pour le checkout
-    const handlePlaceOrder = async ({ billingAddress, paymentDetails }) => {
-      if (cartSummary.unavailableCount > 0) {
-        return { success: false, message: 'Retirez les produits indisponibles avant validation.' };
-      }
-      if (cartDetails.length === 0) {
-        return { success: false, message: 'Votre panier est vide.' };
-      }
-      try {
-        // Ici, on simule la validation et la création de commande (mock)
-        const createdOrder = {
-          id: `order-${Date.now()}`,
-          billingAddress,
-          paymentDetails,
-          items: cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-          status: 'confirmed',
-          createdAt: new Date().toISOString(),
-        };
-        setOrders((previous) => [createdOrder, ...previous.filter((order) => order.id !== createdOrder.id)]);
-        setLastOrderId(createdOrder.id);
-        setCartItems([]);
-        setProducts((previous) =>
-          previous.map((product) => {
-            const orderedItem = cartDetails.find((item) => item.productId === product.id);
-            if (!orderedItem) return product;
-            return { ...product, availableStock: Math.max(0, product.availableStock - orderedItem.quantity) };
-          })
-        );
-        setUserProfile((previous) => ({
-          ...previous,
-          addresses: previous.addresses?.length ? previous.addresses : [billingAddress],
-          paymentMethods: previous.paymentMethods?.length
-            ? previous.paymentMethods
-            : [
-                {
-                  id: `pm-${Date.now()}`,
-                  label: 'Carte enregistrée',
-                  cardholderName: paymentDetails.cardholderName,
-                  last4: paymentDetails.cardNumber?.slice(-4) || '',
-                  expiry: paymentDetails.expiry,
-                },
-              ],
-        }));
-        navigate('/confirmation', { order: createdOrder.id });
-        return { success: true, message: 'Commande validée.' };
-      } catch (error) {
-        return { success: false, message: error.message || 'La commande n’a pas pu être enregistrée.' };
-      }
-    };
   const { t } = useI18n();
   const location = useLocation();
   const routerNavigate = useNavigate();
@@ -391,7 +343,6 @@ export default function App() {
   };
 
   const handleLogin = async (params) => {
-    // Ne garder que email et password pour le backend
     const { email, password } = params;
     if (!email || !password) {
       return { success: false, message: 'Veuillez renseigner votre e-mail et votre mot de passe.' };
@@ -399,21 +350,17 @@ export default function App() {
 
     try {
       const result = await authService.login({ email, password });
+      // authService.login lève une erreur sur échec — on n'arrive ici qu'en cas de succès
       persistAuthToken(result.token);
       setAuthToken(result.token);
-      // On force la persistance complète de la session dans le localStorage
       const newSession = { isAuthenticated: true, role: result.userRole, email: result.user?.email };
       setSession(newSession);
       window.localStorage.setItem('althea-session', JSON.stringify(newSession));
       setUserProfile((previous) => ({ ...previous, ...result.user }));
-      // Redirige vers l'accueil après connexion
       navigate('/');
       return { success: true, message: 'Connexion réussie.' };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message || 'Connexion impossible.',
-      };
+      return { success: false, message: error.message || 'Connexion impossible.' };
     }
   };
 
@@ -496,6 +443,28 @@ export default function App() {
 
     setSession({ isAuthenticated: false, role: 'guest' });
     navigate('/');
+  };
+
+  const handlePlaceOrder = async ({ billingAddress, paymentDetails }) => {
+    if (cartSummary.unavailableCount > 0) {
+      return { success: false, message: 'Retirez les produits indisponibles avant validation.' };
+    }
+    if (cartDetails.length === 0) {
+      return { success: false, message: 'Votre panier est vide.' };
+    }
+    try {
+      const items = cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity }));
+      // Appel API réel — le backend calcule le total côté serveur
+      const payload = await apiClient.post('/pg/orders', { items, billingAddress, paymentDetails });
+      const createdOrder = payload.order;
+      setOrders((previous) => [createdOrder, ...previous]);
+      setLastOrderId(createdOrder.id);
+      setCartItems([]);
+      navigate('/confirmation', { order: createdOrder.id });
+      return { success: true, message: 'Commande validée.' };
+    } catch (error) {
+      return { success: false, message: error.message || 'La commande n\'a pas pu être enregistrée.' };
+    }
   };
 
   const handleMoveCarouselSlide = (slideId, direction) => {
@@ -701,6 +670,7 @@ export default function App() {
           <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={navigate} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} onNavigate={navigate} />} />
           <Route path="/forgot" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword onNavigate={navigate} />} />
 
           <Route
             path="/account"

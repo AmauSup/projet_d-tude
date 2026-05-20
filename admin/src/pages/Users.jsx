@@ -1,20 +1,21 @@
-
-import React, { useState } from 'react';
-import { Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, IconButton } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Button, Typography, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Grid, IconButton, Alert,
+  CircularProgress, Chip,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { apiFetch } from '../contexts/AuthContext';
 import UserForm from '../components/UserForm';
 import UserDetailDialog from '../components/UserDetailDialog';
 
-// Données factices pour la maquette
-const fakeUsers = [
-  { id: 1, last_name: 'Dupont', first_name: 'Jean', email: 'jean.dupont@email.com', created_at: '2026-04-20', role: 'admin' },
-  { id: 2, last_name: 'Martin', first_name: 'Alice', email: 'alice.martin@email.com', created_at: '2026-04-22', role: 'user' },
-];
-
 export default function Users() {
-  const [users, setUsers] = useState(fakeUsers);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editData, setEditData] = useState(null);
@@ -22,31 +23,60 @@ export default function Users() {
   const [deleteId, setDeleteId] = useState(null);
   const [openDetail, setOpenDetail] = useState(false);
   const [detailUser, setDetailUser] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  // Ajout utilisateur (mock)
-  const handleAddUser = (data) => {
-    setUsers((prev) => [
-      ...prev,
-      { id: prev.length + 1, ...data, created_at: new Date().toISOString().slice(0, 10) },
-    ]);
-    setOpenAdd(false);
+  const load = () => {
+    setLoading(true);
+    apiFetch('/pg/admin/users')
+      .then((data) => setUsers(data.users || []))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   };
 
-  // Edition utilisateur (mock)
-  const handleEditUser = (data) => {
-    setUsers((prev) => prev.map(u =>
-      u.id === editData.id ? { ...u, ...data } : u
-    ));
-    setOpenEdit(false);
-    setEditData(null);
+  useEffect(() => { load(); }, []);
+
+  const handleAddUser = async (data) => {
+    setSaving(true);
+    try {
+      await apiFetch('/pg/admin/users', { method: 'POST', body: JSON.stringify(data) });
+      setOpenAdd(false);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Suppression utilisateur (mock)
-  const handleDeleteUser = () => {
-    setUsers((prev) => prev.filter(u => u.id !== deleteId));
-    setOpenDelete(false);
-    setDeleteId(null);
+  const handleEditUser = async (data) => {
+    setSaving(true);
+    try {
+      await apiFetch(`/pg/admin/users/${editData.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      setOpenEdit(false);
+      setEditData(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleDeleteUser = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/pg/admin/users/${deleteId}/delete`, { method: 'PATCH' });
+      setOpenDelete(false);
+      setDeleteId(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ p: 2 }}>
@@ -61,8 +91,7 @@ export default function Users() {
         </Grid>
       </Grid>
 
-      {/* TODO: Filtres de recherche (nom, email, rôle, etc.) */}
-      <Box sx={{ mb: 2, color: '#888' }}>À compléter (filtres de recherche)</Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <TableContainer component={Paper}>
         <Table>
@@ -78,45 +107,35 @@ export default function Users() {
             </TableRow>
           </TableHead>
           <TableBody>
+            {users.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  <Typography color="text.secondary">Aucun utilisateur.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.id}</TableCell>
-                <TableCell>{user.last_name}</TableCell>
-                <TableCell>{user.first_name}</TableCell>
+                <TableCell>{user.last_name || '—'}</TableCell>
+                <TableCell>{user.first_name || '—'}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
-                <TableCell>{user.created_at}</TableCell>
-                <TableCell align="right">
-                  <IconButton
+                <TableCell>
+                  <Chip
+                    label={user.is_admin ? 'admin' : 'user'}
+                    color={user.is_admin ? 'primary' : 'default'}
                     size="small"
-                    color="primary"
-                    sx={{ mr: 1 }}
-                    onClick={() => {
-                      setDetailUser(user);
-                      setOpenDetail(true);
-                    }}
-                  >
+                  />
+                </TableCell>
+                <TableCell>{user.created_at ? String(user.created_at).slice(0, 10) : '—'}</TableCell>
+                <TableCell align="right">
+                  <IconButton size="small" color="primary" sx={{ mr: 0.5 }} onClick={() => { setDetailUser(user); setOpenDetail(true); }}>
                     <VisibilityIcon />
                   </IconButton>
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    sx={{ mr: 1 }}
-                    onClick={() => {
-                      setEditData(user);
-                      setOpenEdit(true);
-                    }}
-                  >
-                    <span role="img" aria-label="edit">✏️</span>
+                  <IconButton size="small" color="primary" sx={{ mr: 0.5 }} onClick={() => { setEditData(user); setOpenEdit(true); }}>
+                    <EditIcon />
                   </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => {
-                      setDeleteId(user.id);
-                      setOpenDelete(true);
-                    }}
-                  >
+                  <IconButton size="small" color="error" onClick={() => { setDeleteId(user.id); setOpenDelete(true); }}>
                     <DeleteIcon />
                   </IconButton>
                 </TableCell>
@@ -126,36 +145,31 @@ export default function Users() {
         </Table>
       </TableContainer>
 
-      {/* Modal ajout utilisateur */}
-      <UserForm
-        open={openAdd}
-        onClose={() => setOpenAdd(false)}
-        onSubmit={handleAddUser}
-      />
+      <UserForm open={openAdd} onClose={() => setOpenAdd(false)} onSubmit={handleAddUser} loading={saving} />
 
-      {/* Modal édition utilisateur */}
       <UserForm
         open={openEdit}
         onClose={() => { setOpenEdit(false); setEditData(null); }}
         onSubmit={handleEditUser}
         initialData={editData}
+        loading={saving}
       />
 
-      {/* Modal suppression utilisateur */}
       {openDelete && (
         <Paper elevation={6} sx={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', bgcolor: 'rgba(0,0,0,0.3)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Box sx={{ bgcolor: '#fff', p: 4, borderRadius: 2, minWidth: 320 }}>
             <Typography variant="h6" gutterBottom>Confirmer la suppression</Typography>
-            <Typography>Voulez-vous vraiment supprimer cet utilisateur ?</Typography>
+            <Typography>Voulez-vous vraiment supprimer cet utilisateur ? (soft-delete)</Typography>
             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-              <Button onClick={() => { setOpenDelete(false); setDeleteId(null); }}>Annuler</Button>
-              <Button variant="contained" color="error" onClick={handleDeleteUser}>Supprimer</Button>
+              <Button onClick={() => { setOpenDelete(false); setDeleteId(null); }} disabled={saving}>Annuler</Button>
+              <Button variant="contained" color="error" onClick={handleDeleteUser} disabled={saving}>
+                {saving ? <CircularProgress size={18} color="inherit" /> : 'Supprimer'}
+              </Button>
             </Box>
           </Box>
         </Paper>
       )}
 
-      {/* Modal détail utilisateur */}
       <UserDetailDialog
         open={openDetail}
         onClose={() => { setOpenDetail(false); setDetailUser(null); }}

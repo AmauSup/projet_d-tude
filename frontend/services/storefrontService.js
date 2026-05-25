@@ -1,19 +1,39 @@
 import { apiClient } from './apiClient.js';
 
 function normalizeProduct(p) {
+  const description = p.description || p.description_fr || '';
+  const characteristics = p.characteristics || p.characteristics_fr || '';
+  const technicalFeatures = characteristics
+    ? characteristics.split(/[\n;]/).map((s) => s.trim()).filter(Boolean)
+    : [];
+  let images;
+  if (p.images && Array.isArray(p.images)) {
+    images = p.images;
+  } else if (p.image) {
+    images = [p.image];
+  } else {
+    images = [];
+  }
+  const priceCents = Math.round(Number(p.price || p.price_cents || 0) * 100);
+
   return {
     id: p.id,
     slug: p.slug || `product-${p.id}`,
     name: p.name || p.name_fr || '',
-    description: p.description || p.description_fr || '',
-    characteristics: p.characteristics || p.characteristics_fr || '',
+    description,
+    shortDescription: description.slice(0, 140) || '',
+    characteristics,
+    technicalFeatures,
+    tags: Array.isArray(p.tags) ? p.tags : [],
     price: Number(p.price) || 0,
+    priceCents,
     availableStock: Number(p.stock) || 0,
     categoryId: p.category_id,
     categorySlug: p.category_slug || '',
     image: p.image || '',
-    priorityRank: p.priority || 0,
-    featuredRank: p.featured || 0,
+    images,
+    priorityRank: Number(p.priority) || 0,
+    featuredRank: Number(p.featured) || 0,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };

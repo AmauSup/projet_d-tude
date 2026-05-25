@@ -12,13 +12,13 @@ const routes = require('./routes');
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
-const ALLOWED_ORIGINS = [
+const ALLOWED_ORIGINS = new Set([
   process.env.FRONTEND_URL || 'http://localhost:5173',
   process.env.ADMIN_URL || 'http://localhost:5174',
-];
+]);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
     return cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -54,7 +54,7 @@ function rateLimit(windowMs, max) {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('neon.tech')
+  ssl: process.env.DATABASE_URL?.includes('neon.tech')
     ? { rejectUnauthorized: false }
     : undefined,
 });
@@ -66,6 +66,48 @@ const JWT_EXPIRES = process.env.JWT_EXPIRES || '1d';
 app.locals.pool = pool;
 app.locals.jwtSecret = JWT_SECRET;
 app.locals.jwtExpires = JWT_EXPIRES;
+
+// Migrations auto au démarrage
+pool.query(`
+  ALTER TABLE product ADD COLUMN IF NOT EXISTS featured INT NOT NULL DEFAULT 0;
+  ALTER TABLE product ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+  CREATE TABLE IF NOT EXISTS user_address (
+    id          SERIAL PRIMARY KEY,
+    user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label       VARCHAR(100),
+    type        VARCHAR(20) NOT NULL DEFAULT 'shipping',
+    first_name  VARCHAR(100),
+    last_name   VARCHAR(100),
+    address1    VARCHAR(255) NOT NULL DEFAULT '',
+    address2    VARCHAR(255),
+    city        VARCHAR(100) NOT NULL DEFAULT '',
+    postal_code VARCHAR(20),
+    region      VARCHAR(100),
+    country     VARCHAR(100) NOT NULL DEFAULT 'France',
+    phone       VARCHAR(30),
+    email       VARCHAR(255),
+    is_default  BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS admin_log (
+    id         SERIAL PRIMARY KEY,
+    admin_id   INT REFERENCES users(id) ON DELETE SET NULL,
+    action     VARCHAR(255) NOT NULL,
+    target     VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`).catch((e) => console.warn('[startup migration]', e.message));
+
+async function logAdmin(adminId, action, target) {
+  await pool.query(
+    'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
+    [adminId, action, target || null],
+  ).catch((e) => console.warn('[admin_log]', e.message));
+}
+
+function simulateEmail(type, to, data) {
+  console.info(`[EMAIL SIMULATION] type=${type} to=${to}`, JSON.stringify(data));
+}
 
 // Middleware JWT partagé
 function authenticateToken(req, res, next) {
@@ -120,6 +162,7 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
     );
     const user = result.rows[0];
     const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    simulateEmail('welcome', user.email, { first_name: user.first_name });
     return res.status(201).json({
       success: true,
       token,
@@ -185,10 +228,12 @@ app.put('/api/pg/auth/profile', authenticateToken, async (req, res) => {
 });
 
 // --- PRODUITS PUBLICS ---
-app.get('/api/pg/products', async (req, res) => {
+app.get('/api/pg/products', async (_req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT p.id, p.price, p.stock, p.image, p.category_id, p.created_at, p.updated_at,
+             COALESCE(p.priority,0) AS priority, COALESCE(p.featured,0) AS featured,
+             p.slug,
              pt.name, pt.description, pt.characteristics,
              c.name AS category_name, c.slug AS category_slug
       FROM product p
@@ -206,11 +251,13 @@ app.get('/api/pg/products', async (req, res) => {
 });
 
 // --- STOREFRONT ---
-app.get('/api/pg/storefront', async (req, res) => {
+app.get('/api/pg/storefront', async (_req, res) => {
   try {
     const [productsRes, categoriesRes] = await Promise.all([
       pool.query(`
         SELECT p.id, p.price, p.stock, p.image, p.category_id, p.created_at,
+               COALESCE(p.priority,0) AS priority, COALESCE(p.featured,0) AS featured,
+               p.slug,
                pt.name, pt.description, pt.characteristics,
                c.slug AS category_slug
         FROM product p
@@ -226,11 +273,11 @@ app.get('/api/pg/storefront', async (req, res) => {
     let homeContent = { fixedMessage: 'Bienvenue sur Althea Systems.', carousel: [] };
     try {
       const hcRes = await pool.query('SELECT * FROM homepage_content ORDER BY id LIMIT 1');
-      if (hcRes.rows[0]) homeContent.fixedMessage = hcRes.rows[0].fixed_message || homeContent.fixedMessage;
+      homeContent.fixedMessage = hcRes.rows[0]?.fixed_message || homeContent.fixedMessage;
       const carRes = await pool.query('SELECT * FROM carousel ORDER BY order_index ASC');
       homeContent.carousel = carRes.rows;
-    } catch (_) {
-      // tables optionnelles, on ignore si absentes
+    } catch (e) {
+      console.warn('[storefront] tables optionnelles absentes:', e.message);
     }
 
     return res.json({ success: true, products: productsRes.rows, categories: categoriesRes.rows, homeContent });
@@ -282,6 +329,7 @@ app.post('/api/pg/admin/products', authenticateToken, async (req, res) => {
       );
     }
     await client.query('COMMIT');
+    logAdmin(req.user.id, 'create_product', `product:${product.id}`);
     return res.status(201).json({ success: true, product });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -295,14 +343,15 @@ app.post('/api/pg/admin/products', authenticateToken, async (req, res) => {
 app.put('/api/pg/admin/products/:id', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
   const { id } = req.params;
-  const { price, stock, image, category_id, name, description, characteristics, priority } = req.body;
+  const { price, stock, image, category_id, name, description, characteristics, priority, featured, slug } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(
-      'UPDATE product SET price=$1, stock=$2, image=$3, category_id=$4, priority=$5, updated_at=NOW() WHERE id=$6',
-      [price, stock, image, category_id, priority || 0, id],
+      'UPDATE product SET price=$1, stock=$2, image=$3, category_id=$4, priority=$5, featured=$6, slug=$7, updated_at=NOW() WHERE id=$8',
+      [price, stock, image, category_id, priority || 0, featured || 0, slug || null, id],
     );
+    logAdmin(req.user.id, 'update_product', `product:${id}`);
     if (name !== undefined) {
       const langRes = await client.query("SELECT id FROM language WHERE code = 'fr' LIMIT 1");
       const langId = langRes.rows[0]?.id || 1;
@@ -328,6 +377,7 @@ app.delete('/api/pg/admin/products/:id', authenticateToken, async (req, res) => 
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
   try {
     await pool.query('UPDATE product SET deleted_at = NOW() WHERE id = $1', [req.params.id]);
+    logAdmin(req.user.id, 'delete_product', `product:${req.params.id}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin delete product]', err.message);
@@ -464,6 +514,23 @@ app.post('/api/pg/orders', authenticateToken, async (req, res) => {
     }
 
     await client.query('COMMIT');
+
+    // Email de confirmation commande (simulé)
+    try {
+      const userRes = await pool.query('SELECT email, first_name FROM users WHERE id=$1', [req.user.id]);
+      const u = userRes.rows[0];
+      if (u) {
+        simulateEmail('order_confirmation', u.email, {
+          first_name: u.first_name,
+          order_id: order.id,
+          total: total,
+          items: validatedItems.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        });
+      }
+    } catch (emailErr) {
+      console.warn('[order email]', emailErr.message);
+    }
+
     return res.status(201).json({ success: true, order: { ...order, items: validatedItems } });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -484,15 +551,14 @@ app.post('/api/pg/support/contact', async (req, res) => {
       [email, subject || 'Contact', message],
     );
     return res.status(201).json({ success: true, id: rows[0].id });
-  } catch (_err) {
-    // La table peut ne pas encore exister, on stocke quand même en log
-    console.log('[contact]', { name, email, subject, message });
+  } catch (err) {
+    console.warn('[contact] table indisponible, log fallback:', err.message, { name, email, subject, message });
     return res.status(201).json({ success: true });
   }
 });
 
 // --- LOGOUT ---
-app.post('/api/pg/auth/logout', (req, res) => {
+app.post('/api/pg/auth/logout', (_req, res) => {
   return res.json({ success: true });
 });
 
@@ -869,8 +935,7 @@ app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (r
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      // En production : envoyer l'email ici
-      console.info('[forgot-password] token généré pour', email, ':', token);
+      simulateEmail('reset_password', email, { token, link: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}` });
     }
   } catch (err) {
     console.error('[forgot-password]', err.message);
@@ -900,8 +965,88 @@ app.post('/api/pg/auth/reset-password', rateLimit(15 * 60 * 1000, 10), async (re
   }
 });
 
+// --- ADRESSES UTILISATEUR ---
+app.get('/api/pg/auth/addresses', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM user_address WHERE user_id=$1 ORDER BY is_default DESC, created_at ASC',
+      [req.user.id],
+    );
+    return res.json({ success: true, addresses: rows });
+  } catch (err) {
+    console.error('[addresses get]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/pg/auth/addresses', authenticateToken, async (req, res) => {
+  const { label, type, first_name, last_name, address1, address2, city, postal_code, region, country, phone, email, is_default } = req.body;
+  if (!address1 || !city) return res.status(400).json({ message: 'Adresse et ville requises.' });
+  try {
+    if (is_default) {
+      await pool.query('UPDATE user_address SET is_default=FALSE WHERE user_id=$1', [req.user.id]);
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO user_address (user_id,label,type,first_name,last_name,address1,address2,city,postal_code,region,country,phone,email,is_default)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [req.user.id, label||'', type||'shipping', first_name||'', last_name||'', address1, address2||'', city, postal_code||'', region||'', country||'France', phone||'', email||'', !!is_default],
+    );
+    return res.status(201).json({ success: true, address: rows[0] });
+  } catch (err) {
+    console.error('[address create]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.put('/api/pg/auth/addresses/:id', authenticateToken, async (req, res) => {
+  const { label, type, first_name, last_name, address1, address2, city, postal_code, region, country, phone, email, is_default } = req.body;
+  try {
+    const own = await pool.query('SELECT id FROM user_address WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if (!own.rows[0]) return res.status(404).json({ message: 'Adresse introuvable.' });
+    if (is_default) {
+      await pool.query('UPDATE user_address SET is_default=FALSE WHERE user_id=$1', [req.user.id]);
+    }
+    await pool.query(
+      `UPDATE user_address SET label=$1,type=$2,first_name=$3,last_name=$4,address1=$5,address2=$6,city=$7,postal_code=$8,region=$9,country=$10,phone=$11,email=$12,is_default=$13 WHERE id=$14`,
+      [label||'', type||'shipping', first_name||'', last_name||'', address1, address2||'', city, postal_code||'', region||'', country||'France', phone||'', email||'', !!is_default, req.params.id],
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[address update]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.delete('/api/pg/auth/addresses/:id', authenticateToken, async (req, res) => {
+  try {
+    const own = await pool.query('SELECT id FROM user_address WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if (!own.rows[0]) return res.status(404).json({ message: 'Adresse introuvable.' });
+    await pool.query('DELETE FROM user_address WHERE id=$1', [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[address delete]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// --- ADMIN LOGS (lecture) ---
+app.get('/api/pg/admin/logs', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT al.*, u.email AS admin_email
+      FROM admin_log al LEFT JOIN users u ON u.id = al.admin_id
+      ORDER BY al.created_at DESC LIMIT 200
+    `);
+    return res.json({ success: true, logs: rows });
+  } catch (err) {
+    console.error('[admin logs]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
 // Error handler global
-app.use((err, req, res, _next) => {
+app.use((err, _req, res, _next) => {
   console.error('[Unhandled Error]', err);
   const status = err.status || 500;
   const message = process.env.NODE_ENV === 'production' ? 'Erreur interne.' : err.message;

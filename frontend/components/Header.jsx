@@ -24,6 +24,11 @@ Header.propTypes = {
       label: PropTypes.string.isRequired,
     })
   ),
+  userProfile: PropTypes.shape({
+    first_name: PropTypes.string,
+    last_name: PropTypes.string,
+    email: PropTypes.string,
+  }),
   onNavigate: PropTypes.func.isRequired,
   onSearchSubmit: PropTypes.func.isRequired,
   onLogout: PropTypes.func,
@@ -65,16 +70,12 @@ export default function Header({
 	};
 
 	
-	// DEBUG: Affiche l'état reçu
-	// eslint-disable-next-line no-console
-	console.log('[Header] isAuthenticated:', isAuthenticated, 'userProfile:', userProfile);
-
 	// Rendu du header principal
 	return (
 		<header className="site-header">
 			<div className="site-header__container">
 				<div className="site-header__zone site-header__zone--left">
-					<button type="button" className="site-header__brand" onClick={() => onNavigate('/')}> 
+					<button type="button" className="site-header__brand" onClick={() => onNavigate('/')}>
 						<span className="site-header__brand-text">Althea Medical</span>
 					</button>
 				</div>
@@ -91,7 +92,19 @@ export default function Header({
 						<button type="submit" className="btn btn--primary site-header__search-btn">{t('nav.search')}</button>
 					</form>
 				</div>
-				<nav id="main-navigation" className={`site-header__nav ${menuOpen ? 'is-open' : ''}`}> 
+				<button
+					type="button"
+					className="site-header__hamburger"
+					aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+					aria-expanded={menuOpen}
+					aria-controls="main-navigation"
+					onClick={() => setMenuOpen((prev) => !prev)}
+				>
+					<span className="site-header__hamburger-bar" />
+					<span className="site-header__hamburger-bar" />
+					<span className="site-header__hamburger-bar" />
+				</button>
+				<nav id="main-navigation" className={`site-header__nav ${menuOpen ? 'is-open' : ''}`}>
 					<button
 						type="button"
 						className={`site-header__link site-header__link--nav ${currentPath === '/' ? 'is-active' : ''}`}

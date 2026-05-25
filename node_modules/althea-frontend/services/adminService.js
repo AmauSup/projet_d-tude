@@ -20,7 +20,7 @@ export const adminService = {
     return data.product || product;
   },
   async deleteProduct(id) {
-    return apiClient.patch(`/admin/products/${id}/delete`, {});
+    return apiClient.delete(`/pg/admin/products/${id}`);
   },
 
   // --- COMMANDES ---
@@ -42,8 +42,27 @@ export const adminService = {
     const data = await apiClient.get('/pg/admin/users');
     return data.users || data;
   },
+  async createUser(user) {
+    const data = await apiClient.post('/pg/admin/users', user);
+    return data.user || data;
+  },
+  async updateUser(id, user) {
+    return apiClient.put(`/pg/admin/users/${id}`, user);
+  },
   async deleteUser(id) {
     return apiClient.patch(`/pg/admin/users/${id}/delete`, {});
+  },
+
+  // --- CATEGORIES ---
+  async createCategory(cat) {
+    const data = await apiClient.post('/pg/admin/categories', cat);
+    return data.category || data;
+  },
+  async updateCategory(id, cat) {
+    return apiClient.put(`/pg/admin/categories/${id}`, cat);
+  },
+  async deleteCategory(id) {
+    return apiClient.delete(`/pg/admin/categories/${id}`);
   },
 
   // --- MESSAGES CONTACT ---
@@ -51,7 +70,13 @@ export const adminService = {
     const data = await apiClient.get('/pg/admin/messages');
     return data.messages || data;
   },
-  async updateMessageStatus(id, status) {
-    return apiClient.patch(`/pg/admin/messages/${id}`, { status });
+  async updateMessageStatus(id, status, admin_reply) {
+    return apiClient.patch(`/pg/admin/messages/${id}`, { status, admin_reply });
+  },
+
+  // --- LOGS ADMIN ---
+  async listLogs() {
+    const data = await apiClient.get('/pg/admin/logs');
+    return data.logs || data;
   },
 };

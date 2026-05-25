@@ -33,6 +33,7 @@ import AdminProducts from './pages/Admin/AdminProducts.jsx';
 import AdminCategories from './pages/Admin/AdminCategories.jsx';
 import AdminOrders from './pages/Admin/AdminOrders.jsx';
 import AdminSupport from './pages/Admin/AdminSupport.jsx';
+import AdminUsers from './pages/Admin/AdminUsers.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
 // Suppression de l’import mockData.js : tout l’état initial vient de l’API
 // (mockData.js supprimé, tout vient de l’API)
@@ -106,9 +107,6 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [homeContent, setHomeContent] = useState({ fixedMessage: '', carousel: [] });
   const [session, setSession] = useLocalStorage('althea-session', { isAuthenticated: false, role: 'guest' });
-  // DEBUG : log l'état de session à chaque render
-  // eslint-disable-next-line no-console
-  console.log('[App] session:', session);
   const [userProfile, setUserProfile] = useLocalStorage('althea-user-profile', null);
   const [cartItems, setCartItems] = useLocalStorage('althea-cart', []);
   const [orders, setOrders] = useState([]);
@@ -728,8 +726,8 @@ export default function App() {
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard stats={formattedAdminStats} />} />
-            <Route path="products" element={<AdminProducts products={products} categories={sortedCategories} onToggleProductPriority={handleToggleProductPriority} onToggleFeatured={handleToggleFeatured} onToggleProductAvailability={handleToggleProductAvailability} />} />
-            <Route path="categories" element={<AdminCategories categories={sortedCategories} onSetCategoryOrder={handleSetCategoryOrder} />} />
+            <Route path="products" element={<AdminProducts products={products} categories={sortedCategories} onToggleProductPriority={handleToggleProductPriority} onToggleFeatured={handleToggleFeatured} onToggleProductAvailability={handleToggleProductAvailability} onProductsChange={loadStorefrontData} />} />
+            <Route path="categories" element={<AdminCategories categories={sortedCategories} onSetCategoryOrder={handleSetCategoryOrder} onCategoriesChange={loadStorefrontData} />} />
             <Route path="orders" element={<AdminOrders orders={orders} products={products} onUpdateOrderStatus={handleUpdateOrderStatus} />} />
             <Route
               path="content/home"
@@ -750,6 +748,7 @@ export default function App() {
               }
             />
             <Route path="support" element={<AdminSupport />} />
+            <Route path="users" element={<AdminUsers />} />
             <Route path="*" element={<NotFound />} />
           </Route>
 
@@ -758,6 +757,35 @@ export default function App() {
       </main>
 
       <Footer onNavigate={navigate} />
+
+      {location.pathname !== '/contact' && (
+        <button
+          type="button"
+          aria-label="Contacter le support"
+          title="Contacter le support"
+          onClick={() => navigate('/contact')}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000,
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'var(--color-primary, #1a6b5a)',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.5rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          💬
+        </button>
+      )}
     </div>
   );
 }

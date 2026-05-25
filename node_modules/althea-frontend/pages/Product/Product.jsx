@@ -20,7 +20,16 @@ export default function Product({ product, relatedProducts = [], onAddToCart, on
 			<div className="product-layout">
 				<div className="product-gallery">
 					<div className="product-main-image">
-						<div className="product-main-image__label">{product.images[activeImage]}</div>
+						{product.images[activeImage] ? (
+							<img
+								src={product.images[activeImage]}
+								alt={product.name}
+								className="product-main-image__img"
+								style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+							/>
+						) : (
+							<div className="product-main-image__placeholder" aria-hidden="true" />
+						)}
 					</div>
 					<div className="product-thumbs">
 						{product.images.map((image, index) => (
@@ -29,8 +38,9 @@ export default function Product({ product, relatedProducts = [], onAddToCart, on
 								type="button"
 								className={`product-thumb ${index === activeImage ? 'is-active' : ''}`}
 								onClick={() => setActiveImage(index)}
+								aria-label={`Image ${index + 1}`}
 							>
-								{image}
+								<img src={image} alt={`${product.name} — vue ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 							</button>
 						))}
 					</div>
@@ -72,7 +82,11 @@ export default function Product({ product, relatedProducts = [], onAddToCart, on
 				<div className="card-grid">
 					{relatedProducts.map((relatedProduct) => (
 						<article className="card" key={relatedProduct.id}>
-							<div className="card__image" />
+							{relatedProduct.images?.[0] ? (
+								<img src={relatedProduct.images[0]} alt={relatedProduct.name} className="card__image" style={{ objectFit: 'cover' }} />
+							) : (
+								<div className="card__image" aria-hidden="true" />
+							)}
 							<h3>{relatedProduct.name}</h3>
 							<p>{relatedProduct.shortDescription}</p>
 							<strong>{formatPrice(relatedProduct.priceCents)}</strong>

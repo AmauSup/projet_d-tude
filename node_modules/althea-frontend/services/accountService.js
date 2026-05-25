@@ -15,7 +15,7 @@ export const accountService = {
     return data.user || profile;
   },
   async updateAddresses(addresses) {
-    const data = await apiClient.put('/account/addresses', { addresses });
+    const data = await apiClient.put('/pg/auth/addresses', { addresses });
     return data.user || { addresses };
   },
   async changePassword({ oldPassword, newPassword }) {

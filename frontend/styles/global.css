@@ -113,7 +113,7 @@ h3 {
   font-size: 1rem;
   transition: all 0.18s cubic-bezier(.4,0,.2,1);
   letter-spacing: 0.3px;
-  background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%);
+  background: linear-gradient(90deg, #075985 0%, #0369a1 100%);
   color: #fff;
   box-shadow: 0 2px 8px 0 rgba(14, 165, 233, 0.10);
   outline: none;
@@ -145,9 +145,9 @@ h3 {
 }
 
 .btn--secondary:hover {
-  background: #0ea5e9;
+  background: #0369a1;
   color: #fff;
-  border-color: #0ea5e9;
+  border-color: #0369a1;
   box-shadow: 0 2px 8px 0 rgba(14, 165, 233, 0.18);
 }
 
@@ -361,4 +361,107 @@ h3 {
   .table-like__row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- Focus visible global ---- */
+:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 3px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Pagination ---- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.pagination__btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1.5px solid #1e293b;
+  background: #0a1120;
+  color: #e0e7ef;
+  transition: all 0.18s;
+}
+
+.pagination__btn:hover:not(:disabled) {
+  background: #0369a1;
+  color: #fff;
+  border-color: #0369a1;
+}
+
+.pagination__btn--active {
+  background: #0369a1;
+  color: #fff;
+  border-color: #0369a1;
+}
+
+.pagination__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Mobile list view (catégories) ---- */
+@media (max-width: 600px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding: 20px 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Floating contact button ---- */
+.contact-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 50;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #0369a1;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.contact-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(14, 165, 233, 0.55);
+}
+
+.contact-fab:focus-visible {
+  outline: 3px solid #7dd3fc;
+  outline-offset: 3px;
 }

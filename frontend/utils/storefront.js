@@ -10,7 +10,7 @@ function levenshteinDistance(source, target) {
   const targetValue = target.toLowerCase();
   const rows = sourceValue.length + 1;
   const columns = targetValue.length + 1;
-  const matrix = Array.from({ length: rows }, () => Array(columns).fill(0));
+  const matrix = Array.from({ length: rows }, () => new Array(columns).fill(0));
 
   for (let row = 0; row < rows; row += 1) {
     matrix[row][0] = row;
@@ -66,13 +66,17 @@ export function buildRelatedProducts(products, product, limit = 6) {
   ).slice(0, limit);
 }
 
+function normalize(str) {
+  return str.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
 function getSearchRank(query, text) {
   if (!query) {
     return 0;
   }
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const normalizedText = text.toLowerCase();
+  const normalizedQuery = normalize(query.trim());
+  const normalizedText = normalize(text);
 
   if (normalizedText === normalizedQuery) {
     return 1;
@@ -113,9 +117,11 @@ export function searchProducts(products, criteria) {
     .map((product) => {
       const nameRank = getSearchRank(query, product.name);
       const descriptionRank = getSearchRank(description || query, product.description);
-      const technicalRank = technical
-        ? getSearchRank(technical, `${product.technicalFeatures.join(' ')} ${product.tags.join(' ')}`)
-        : 0;
+      const techText = [
+        ...(product.technicalFeatures || []),
+        ...(product.tags || []),
+      ].join(' ');
+      const technicalRank = technical ? getSearchRank(technical, techText) : 0;
 
       return {
         ...product,
@@ -130,7 +136,11 @@ export function searchProducts(products, criteria) {
       const matchesText = !query || product.relevanceScore < 99;
       const matchesDescription = !description || getSearchRank(description, product.description) < 99;
       const matchesTechnical =
-        !technical || getSearchRank(technical, `${product.technicalFeatures.join(' ')} ${product.tags.join(' ')}`) < 99;
+        !technical ||
+        getSearchRank(
+          technical,
+          [...(product.technicalFeatures || []), ...(product.tags || [])].join(' '),
+        ) < 99;
 
       return (
         matchesCategory &&

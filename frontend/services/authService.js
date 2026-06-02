@@ -1,55 +1,24 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const authService = {
-  async login({ email, password }) {
-    // Utilise la route PostgreSQL directe du backend
-    const data = await apiClient.post('/pg/auth/login', { email, password });
-    // En cas d'erreur, apiClient lance déjà une Error — on arrive ici uniquement si succès
-    return {
-      success: true,
-      token: data.token,
-      userRole: data.user?.is_admin ? 'admin' : 'customer',
-      user: {
-        ...data.user,
-        role: data.user?.is_admin ? 'admin' : 'customer',
-      },
-    };
+  async login(credentials) {
+    await wait();
+    // Backend hook: POST /auth/login
+    return { success: true, token: 'mock-token', userRole: credentials.email?.includes('admin') ? 'admin' : 'customer' };
   },
-
-  async register({ first_name, last_name, email, password }) {
-    const data = await apiClient.post('/pg/auth/register', {
-      first_name,
-      last_name,
-      email,
-      password,
-    });
-    return {
-      success: true,
-      token: data.token,
-      userRole: data.user?.is_admin ? 'admin' : 'customer',
-      user: {
-        ...data.user,
-        role: data.user?.is_admin ? 'admin' : 'customer',
-      },
-    };
+  async register(payload) {
+    await wait();
+    // Backend hook: POST /auth/register + email verification workflow
+    return { success: true, requiresEmailVerification: true, payload };
   },
-
   async forgotPassword(email) {
-    await apiClient.post('/pg/auth/forgot-password', { email });
-    return { success: true };
+    await wait();
+    // Backend hook: POST /auth/forgot-password
+    return { success: true, email };
   },
-
-  async resetPassword({ token, newPassword }) {
-    await apiClient.post('/pg/auth/reset-password', { token, newPassword });
-    return { success: true };
-  },
-
   async logout() {
-    try {
-      await apiClient.post('/pg/auth/logout', {});
-    } catch {
-      // Stateless — on ignore les erreurs réseau au logout
-    }
+    await wait();
+    // Backend hook: POST /auth/logout / invalidate token
     return { success: true };
   },
 };

@@ -1,24 +1,14 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const accountService = {
-  async getProfile() {
-    const data = await apiClient.get('/pg/auth/profile');
-    return data.user || data;
-  },
   async updateProfile(profile) {
-    const payload = {
-      first_name: profile.firstName,
-      last_name: profile.lastName,
-      email: profile.email,
-    };
-    const data = await apiClient.put('/pg/auth/profile', payload);
-    return data.user || profile;
+    await wait();
+    // Backend hook: PUT /account/profile
+    return profile;
   },
   async updateAddresses(addresses) {
-    const data = await apiClient.put('/pg/auth/addresses', { addresses });
-    return data.user || { addresses };
-  },
-  async changePassword({ oldPassword, newPassword }) {
-    return apiClient.put('/pg/auth/password', { oldPassword, newPassword });
+    await wait();
+    // Backend hook: PUT /account/addresses
+    return addresses;
   },
 };

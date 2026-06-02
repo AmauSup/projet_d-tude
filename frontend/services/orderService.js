@@ -1,12 +1,9 @@
-import { apiClient } from './apiClient.js';
+const wait = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const orderService = {
-  async list() {
-    const data = await apiClient.get('/pg/orders');
-    return data.orders || data;
-  },
-  async create(payload) {
-    const data = await apiClient.post('/pg/orders', payload);
-    return data.order || data;
+  async list(orders) {
+    await wait();
+    // Backend hook: GET /orders (user scoped)
+    return orders;
   },
 };

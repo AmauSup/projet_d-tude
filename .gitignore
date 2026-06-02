@@ -1,7 +1,5 @@
 node_modules/
-admin/node_modules/
 frontend/node_modules/
+.DS_Store
 dist/
 frontend/dist/
-.DS_Store
-**/.DS_Store

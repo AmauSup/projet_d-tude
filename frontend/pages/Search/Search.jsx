@@ -50,12 +50,7 @@ export default function Search({ categories = [], criteria, onChangeCriteria, re
 				<div className="search-results card-grid">
 					{results.map((product) => (
 						<article className="card" key={product.id}>
-							{/* <div className="card__image" /> */}
-							<img
-								src={product.image}
-								alt={product.name}
-								className="card__image"
-							/>
+							<div className="card__image" />
 							<h3>{product.name}</h3>
 							<p>{product.shortDescription}</p>
 							<span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>

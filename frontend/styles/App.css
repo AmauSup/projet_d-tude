@@ -2,23 +2,19 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-
-  background:
-    radial-gradient(circle at top right, rgba(14,165,233,0.08), transparent 25%),
-    radial-gradient(circle at top left, rgba(6,182,212,0.05), transparent 20%),
-    linear-gradient(to bottom, #f8fafc, #ffffff);
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
 }
 
 .app-main {
   flex: 1;
   width: 100%;
-  max-width: 1300px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 24px 48px;
+  padding: 28px 20px 40px;
 }
 
 @media (max-width: 768px) {
   .app-main {
-    padding: 20px 14px 30px;
+    padding: 20px 14px 28px;
   }
 }

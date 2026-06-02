@@ -53,12 +53,7 @@ export default function Category({ categories = [], activeCategory, products = [
 				<div className="card-grid">
 					{filteredProducts.map((product) => (
 						<article className={`card category-card ${product.availableStock <= 0 ? 'is-unavailable' : ''}`} key={product.id}>
-							{/* <div className="card__image" /> */}
-							<img
-							src={product.image}
-							alt={product.name}
-							className="card__image"
-							/>
+							<div className="card__image" />
 							<h3>{product.name}</h3>
 							<p>{product.shortDescription}</p>
 							<div className="inline-actions">

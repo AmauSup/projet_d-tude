@@ -7,6 +7,7 @@ const links = [
   { to: '/admin/categories', label: 'Catégories' },
   { to: '/admin/orders', label: 'Commandes' },
   { to: '/admin/content/home', label: 'Contenu accueil' },
+  { to: '/admin/users', label: 'Utilisateurs' },
   { to: '/admin/support', label: 'Support' },
 ];
 

@@ -32,6 +32,7 @@ import AdminProducts from './pages/Admin/AdminProducts.jsx';
 import AdminCategories from './pages/Admin/AdminCategories.jsx';
 import AdminOrders from './pages/Admin/AdminOrders.jsx';
 import AdminSupport from './pages/Admin/AdminSupport.jsx';
+import AdminUsers from './pages/Admin/AdminUsers.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
 import {
   initialCart,
@@ -78,6 +79,7 @@ function getPasswordValidation(password) {
 
 function RequireAuth({ isAuthenticated, children }) {
   const location = useLocation();
+
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
@@ -87,6 +89,7 @@ function RequireAuth({ isAuthenticated, children }) {
 
 function RequireAdmin({ isAuthenticated, isAdmin, children }) {
   const location = useLocation();
+
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
@@ -113,7 +116,11 @@ export default function App() {
   const [orders, setOrders] = useLocalStorage('althea-orders', initialOrders);
   const [lastOrderId, setLastOrderId] = useLocalStorage('althea-last-order-id', initialOrders[0]?.id ?? null);
   const [searchState, setSearchState] = useLocalStorage('althea-search-state', initialSearchState);
-  const [adminStats, setAdminStats] = useState({ products: products.length, orders: orders.length, revenue: 0 });
+  const [adminStats, setAdminStats] = useState({
+    products: products.length,
+    orders: orders.length,
+    revenue: 0,
+  });
 
   useEffect(() => {
     if (location.pathname === '/search') {
@@ -126,6 +133,7 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
+
     adminService.getStats({ products, orders }).then((stats) => {
       if (mounted) {
         setAdminStats(stats);
@@ -167,7 +175,10 @@ export default function App() {
   }, [products, selectedProduct]);
 
   const featuredProducts = useMemo(
-    () => [...products].filter((product) => product.featuredRank > 0).sort((left, right) => left.featuredRank - right.featuredRank),
+    () =>
+      [...products]
+        .filter((product) => product.featuredRank > 0)
+        .sort((left, right) => left.featuredRank - right.featuredRank),
     [products],
   );
 
@@ -180,6 +191,7 @@ export default function App() {
 
   const navigate = (path, params = {}) => {
     const nextParams = new URLSearchParams();
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         nextParams.set(key, value);
@@ -352,6 +364,7 @@ export default function App() {
   const handleToggleProductPriority = (productId) => {
     setProducts((previous) => {
       const maxPriority = Math.max(0, ...previous.map((product) => product.priorityRank || 0));
+
       return previous.map((product) =>
         product.id === productId
           ? { ...product, priorityRank: product.priorityRank > 0 ? 0 : maxPriority + 1 }
@@ -373,12 +386,23 @@ export default function App() {
   const handleToggleFeatured = (productId) => {
     setProducts((previous) => {
       const maxFeatured = Math.max(0, ...previous.map((product) => product.featuredRank || 0));
+
       return previous.map((product) =>
         product.id === productId
           ? { ...product, featuredRank: product.featuredRank > 0 ? 0 : maxFeatured + 1 }
           : product,
       );
     });
+  };
+
+  const handleDeleteProduct = (productId) => {
+    if (!window.confirm('Supprimer ce produit de l’interface admin ?')) {
+      return;
+    }
+
+    setProducts((previous) =>
+      previous.filter((product) => product.id !== productId),
+    );
   };
 
   const handleSetCategoryOrder = (categoryId, displayOrder) => {
@@ -467,6 +491,7 @@ export default function App() {
               />
             }
           />
+
           <Route
             path="/category/:slug"
             element={
@@ -479,6 +504,7 @@ export default function App() {
               />
             }
           />
+
           <Route
             path="/product/:slug"
             element={
@@ -494,6 +520,7 @@ export default function App() {
               />
             }
           />
+
           <Route
             path="/search"
             element={
@@ -506,6 +533,7 @@ export default function App() {
               />
             }
           />
+
           <Route
             path="/cart"
             element={
@@ -519,6 +547,7 @@ export default function App() {
               />
             }
           />
+
           <Route
             path="/checkout"
             element={
@@ -534,7 +563,12 @@ export default function App() {
               />
             }
           />
-          <Route path="/confirmation" element={<Confirmation order={currentOrder} products={products} onNavigate={navigate} />} />
+
+          <Route
+            path="/confirmation"
+            element={<Confirmation order={currentOrder} products={products} onNavigate={navigate} />}
+          />
+
           <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={navigate} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} onNavigate={navigate} />} />
           <Route path="/forgot" element={<ForgotPassword />} />
@@ -543,10 +577,17 @@ export default function App() {
             path="/account"
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <Account user={userProfile} session={session} orders={orders} onSave={handleSaveAccount} onNavigate={navigate} />
+                <Account
+                  user={userProfile}
+                  session={session}
+                  orders={orders}
+                  onSave={handleSaveAccount}
+                  onNavigate={navigate}
+                />
               </RequireAuth>
             }
           />
+
           <Route
             path="/account/settings"
             element={
@@ -555,6 +596,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/account/addresses"
             element={
@@ -563,6 +605,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/account/payments"
             element={
@@ -580,6 +623,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route path="/contact" element={<Contact onNavigate={navigate} />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/legal" element={<LegalPage />} />
@@ -594,10 +638,47 @@ export default function App() {
             }
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminDashboard stats={formattedAdminStats} />} />
-            <Route path="products" element={<AdminProducts products={products} categories={sortedCategories} onToggleProductPriority={handleToggleProductPriority} onToggleFeatured={handleToggleFeatured} onToggleProductAvailability={handleToggleProductAvailability} />} />
-            <Route path="categories" element={<AdminCategories categories={sortedCategories} onSetCategoryOrder={handleSetCategoryOrder} />} />
-            <Route path="orders" element={<AdminOrders orders={orders} products={products} onUpdateOrderStatus={handleUpdateOrderStatus} />} />
+
+            <Route
+              path="dashboard"
+              element={<AdminDashboard stats={formattedAdminStats} />}
+            />
+
+            <Route
+              path="products"
+              element={
+                <AdminProducts
+                  products={products}
+                  categories={sortedCategories}
+                  onToggleProductPriority={handleToggleProductPriority}
+                  onToggleFeatured={handleToggleFeatured}
+                  onToggleProductAvailability={handleToggleProductAvailability}
+                  onDeleteProduct={handleDeleteProduct}
+                />
+              }
+            />
+
+            <Route
+              path="categories"
+              element={
+                <AdminCategories
+                  categories={sortedCategories}
+                  onSetCategoryOrder={handleSetCategoryOrder}
+                />
+              }
+            />
+
+            <Route
+              path="orders"
+              element={
+                <AdminOrders
+                  orders={orders}
+                  products={products}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
+                />
+              }
+            />
+
             <Route
               path="content/home"
               element={
@@ -616,6 +697,8 @@ export default function App() {
                 />
               }
             />
+
+            <Route path="users" element={<AdminUsers />} />
             <Route path="support" element={<AdminSupport />} />
             <Route path="*" element={<NotFound />} />
           </Route>

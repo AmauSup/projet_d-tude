@@ -196,6 +196,28 @@
   color: #b91c1c;
 }
 
+.burger-menu__socials {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 20px 4px;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.burger-menu__social-link {
+  color: #64748b;
+  font-size: 0.82rem;
+  text-decoration: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.burger-menu__social-link:hover {
+  color: #0284c7;
+}
+
 /* ---- Tablet ---- */
 @media (max-width: 1150px) {
   .site-header__topbar {

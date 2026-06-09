@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Chatbot.css';
+import { supportService } from '../../services/supportService.js';
 
 const FAQ = [
   {
@@ -53,30 +54,61 @@ function findAnswer(input) {
       return entry.answer;
     }
   }
-  return 'Je n\'ai pas trouvé de réponse précise à votre question. Pour une aide personnalisée, contactez notre équipe via la page Contact.';
+  return 'Je n\'ai pas trouvé de réponse précise à votre question. Souhaitez-vous être mis en relation avec un agent ?';
+}
+
+function buildTranscript(messages) {
+  return messages
+    .filter((m) => m.from !== 'system')
+    .map((m) => `[${m.from === 'bot' ? 'Bot' : 'Utilisateur'}] ${m.text}`)
+    .join('\n');
 }
 
 export default function Chatbot() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([{ from: 'bot', text: WELCOME }]);
   const [input, setInput] = useState('');
+  const [escalating, setEscalating] = useState(false);
+  const [escalateEmail, setEscalateEmail] = useState('');
+  const [escalated, setEscalated] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
 
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    document.addEventListener('open-chatbot', handler);
+    return () => document.removeEventListener('open-chatbot', handler);
+  }, []);
+
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
     const userMsg = { from: 'user', text };
-    const botMsg = { from: 'bot', text: findAnswer(text) };
+    const answer = findAnswer(text);
+    const botMsg = { from: 'bot', text: answer };
     setMessages((prev) => [...prev, userMsg, botMsg]);
     setInput('');
   };
 
   const handleKey = (e) => {
     if (e.key === 'Enter') handleSend();
+  };
+
+  const handleEscalate = async () => {
+    const transcript = buildTranscript(messages);
+    await supportService.escalateChatbot({ email: escalateEmail || undefined, transcript });
+    setEscalated(true);
+    setEscalating(false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        from: 'bot',
+        text: 'Votre conversation a été transmise à notre équipe. Un agent vous contactera dans les 24h à l\'adresse indiquée. Merci !',
+      },
+    ]);
   };
 
   return (
@@ -95,20 +127,51 @@ export default function Chatbot() {
             ))}
             <div ref={bottomRef} />
           </div>
-          <div className="chatbot-input-row">
-            <input
-              className="input chatbot-input"
-              type="text"
-              placeholder="Posez votre question…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              aria-label="Message"
-            />
-            <button type="button" className="btn btn--primary chatbot-send" onClick={handleSend}>
-              Envoyer
-            </button>
-          </div>
+
+          {escalating && !escalated ? (
+            <div className="chatbot-escalate-form">
+              <p className="helper-text">Saisissez votre e-mail pour qu'un agent vous recontacte :</p>
+              <input
+                className="input"
+                type="email"
+                placeholder="votre@email.fr"
+                value={escalateEmail}
+                onChange={(e) => setEscalateEmail(e.target.value)}
+                aria-label="Votre adresse e-mail"
+              />
+              <div className="chatbot-input-row" style={{ marginTop: 6 }}>
+                <button type="button" className="btn btn--secondary" onClick={() => setEscalating(false)}>Annuler</button>
+                <button type="button" className="btn btn--primary" onClick={handleEscalate}>Envoyer</button>
+              </div>
+            </div>
+          ) : (
+            <div className="chatbot-input-row">
+              <input
+                className="input chatbot-input"
+                type="text"
+                placeholder="Posez votre question…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                aria-label="Message"
+              />
+              <button type="button" className="btn btn--primary chatbot-send" onClick={handleSend}>
+                Envoyer
+              </button>
+            </div>
+          )}
+
+          {!escalated && !escalating && (
+            <div className="chatbot-footer">
+              <button
+                type="button"
+                className="btn btn--link chatbot-escalate-btn"
+                onClick={() => setEscalating(true)}
+              >
+                Parler à un agent humain
+              </button>
+            </div>
+          )}
         </div>
       )}
       <button

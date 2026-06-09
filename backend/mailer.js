@@ -103,6 +103,23 @@ async function sendPasswordReset(user, resetLink) {
   });
 }
 
+async function sendEmailVerification(user, verifyLink) {
+  await sendMail({
+    to: user.email,
+    subject: 'Confirmez votre adresse e-mail — Althea Systems',
+    html: `
+      <h2>Bienvenue, ${user.first_name} !</h2>
+      <p>Merci de vous être inscrit sur Althea Systems.</p>
+      <p>Cliquez sur le lien ci-dessous pour confirmer votre adresse e-mail et activer votre compte (lien valable <strong>24 heures</strong>) :</p>
+      <p><a href="${verifyLink}" style="background:#0284c7;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Confirmer mon adresse e-mail</a></p>
+      <p>Ou copiez ce lien dans votre navigateur :<br>${verifyLink}</p>
+      <p>Si vous n'avez pas créé de compte, ignorez cet e-mail.</p>
+      <p>— L'équipe Althea Systems</p>
+    `,
+    text: `Confirmez votre compte Althea Systems en cliquant sur ce lien : ${verifyLink}`,
+  });
+}
+
 async function sendAdminOtp(user, otp) {
   await sendMail({
     to: user.email,
@@ -119,4 +136,4 @@ async function sendAdminOtp(user, otp) {
   });
 }
 
-module.exports = { sendWelcome, sendOrderConfirmation, sendPasswordReset, sendAdminOtp };
+module.exports = { sendWelcome, sendEmailVerification, sendOrderConfirmation, sendPasswordReset, sendAdminOtp };

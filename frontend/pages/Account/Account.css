@@ -17,3 +17,55 @@
   transform: translateY(-3px);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
 }
+
+/* Grille de navigation du compte */
+.account-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.account-nav-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 20px 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  transition: all 0.22s ease;
+}
+
+.account-nav-card:hover {
+  border-color: #0284c7;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.12);
+  transform: translateY(-2px);
+}
+
+.account-nav-card__icon {
+  font-size: 1.6rem;
+  margin-bottom: 4px;
+}
+
+.account-nav-card__title {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.account-nav-card__desc {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .account-nav-grid {
+    grid-template-columns: 1fr;
+  }
+}

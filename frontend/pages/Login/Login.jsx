@@ -80,6 +80,19 @@ export default function Login({ onLogin, onNavigate }) {
 						role="alert"
 					>
 						{message}
+						{message.includes('non confirmé') && (
+							<p style={{ marginTop: 8 }}>
+								Vous n'avez pas reçu l'e-mail ?{' '}
+								<button
+									type="button"
+									className="btn btn--link"
+									onClick={() => onNavigate('/resend-verification')}
+									style={{ display: 'inline', padding: 0 }}
+								>
+									Renvoyer le lien de confirmation
+								</button>
+							</p>
+						)}
 					</div>
 				) : null}
 

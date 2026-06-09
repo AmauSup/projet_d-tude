@@ -14,7 +14,11 @@ export default function Cart({ items = [], summary, isAuthenticated, onUpdateQua
 				<div className="cart-list">
 					{items.map((item) => (
 						<article className="cart-item" key={item.productId}>
+							{item.product.image ? (
+							<img className="cart-item__img" src={item.product.image} alt={item.product.name} />
+						) : (
 							<div className="cart-item__img" />
+						)}
 							<div>
 								<h3>{item.product.name}</h3>
 								<p>Prix unitaire : {formatPrice(item.product.priceCents)}</p>

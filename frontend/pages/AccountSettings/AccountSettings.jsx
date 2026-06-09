@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
+
+AccountSettings.propTypes = {
+  user: PropTypes.shape({
+    firstName: PropTypes.string,
+    lastName: PropTypes.string,
+    email: PropTypes.string,
+  }),
+  onSave: PropTypes.func.isRequired,
+  onNavigate: PropTypes.func.isRequired,
+};
 
 export default function AccountSettings({ user = {}, onSave, onNavigate }) {
   const [profile, setProfile] = useState({
     firstName: user.firstName || '',
     lastName: user.lastName || '',
-    email: user.email || '',
   });
   const [profileMsg, setProfileMsg] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
@@ -13,6 +23,11 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
+
+  const [emailForm, setEmailForm] = useState({ newEmail: '', confirmPassword: '' });
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   const handleSaveProfile = async () => {
     setProfileLoading(true);
@@ -28,6 +43,35 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
       setProfileMsg(err.message || 'Erreur lors de la sauvegarde.');
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (!emailForm.newEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.newEmail)) {
+      setEmailMsg('Adresse e-mail invalide.');
+      return;
+    }
+    if (!emailForm.confirmPassword) {
+      setEmailMsg('Veuillez confirmer votre mot de passe actuel.');
+      return;
+    }
+    setEmailLoading(true);
+    setEmailMsg('');
+    try {
+      await apiClient.put('/pg/auth/profile', {
+        email: emailForm.newEmail.trim().toLowerCase(),
+        confirm_password: emailForm.confirmPassword,
+        first_name: user.firstName || '',
+        last_name: user.lastName || '',
+      });
+      onSave({ email: emailForm.newEmail.trim().toLowerCase() });
+      setEmailSuccess(true);
+      setEmailMsg(`E-mail mis à jour : ${emailForm.newEmail.trim().toLowerCase()}`);
+      setEmailForm({ newEmail: '', confirmPassword: '' });
+    } catch (err) {
+      setEmailMsg(err.message || 'Erreur lors du changement d\'e-mail.');
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -64,10 +108,11 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
     <section className="page">
       <header className="page__header">
         <h1 className="page__title">Paramètres du compte</h1>
-        <p className="page__subtitle">Modifiez vos informations personnelles et votre mot de passe.</p>
+        <p className="page__subtitle">Modifiez vos informations personnelles et vos identifiants.</p>
       </header>
 
       <div className="stack">
+        {/* Informations personnelles */}
         <article className="card stack">
           <h2>Informations personnelles</h2>
           <div className="form-grid">
@@ -89,11 +134,6 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
               />
             </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="settings-email">Adresse e-mail</label>
-              <input id="settings-email" className="input" value={profile.email} disabled />
-              <p className="helper-text" style={{ marginTop: 4 }}>La modification d'email nécessite une confirmation par e-mail.</p>
-            </div>
           </div>
           {profileMsg && (
             <div className={`notice ${profileMsg.includes('mis à jour') ? 'notice--success' : 'notice--warning'}`} role="alert">
@@ -107,6 +147,51 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
           </div>
         </article>
 
+        {/* Changement d'adresse e-mail */}
+        <article className="card stack">
+          <h2>Changer l'adresse e-mail</h2>
+          <p className="helper-text">
+            E-mail actuel : <strong>{user.email || '—'}</strong>
+          </p>
+          <div className="form-grid">
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label" htmlFor="settings-new-email">Nouvel e-mail</label>
+              <input
+                id="settings-new-email"
+                className="input"
+                type="email"
+                placeholder="nouveau@email.fr"
+                value={emailForm.newEmail}
+                onChange={(e) => { setEmailForm({ ...emailForm, newEmail: e.target.value }); setEmailMsg(''); setEmailSuccess(false); }}
+                autoComplete="email"
+              />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label" htmlFor="settings-email-pw">Mot de passe actuel (confirmation)</label>
+              <input
+                id="settings-email-pw"
+                className="input"
+                type="password"
+                placeholder="Votre mot de passe actuel"
+                value={emailForm.confirmPassword}
+                onChange={(e) => { setEmailForm({ ...emailForm, confirmPassword: e.target.value }); setEmailMsg(''); }}
+                autoComplete="current-password"
+              />
+            </div>
+          </div>
+          {emailMsg && (
+            <div className={`notice ${emailSuccess ? 'notice--success' : 'notice--warning'}`} role="alert">
+              {emailMsg}
+            </div>
+          )}
+          <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
+            <button className="btn btn--primary" type="button" onClick={handleChangeEmail} disabled={emailLoading}>
+              {emailLoading ? 'Modification…' : 'Changer l\'e-mail'}
+            </button>
+          </div>
+        </article>
+
+        {/* Changement de mot de passe */}
         <article className="card stack">
           <h2>Changer le mot de passe</h2>
           <div className="form-grid">

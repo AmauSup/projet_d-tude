@@ -45,8 +45,13 @@ export const authService = {
       success: true,
       token: data.token,
       user: data.user,
-      requiresEmailVerification: false,
+      requires_confirmation: data.requires_confirmation || false,
     };
+  },
+
+  async resendVerification(email) {
+    await apiClient.post('/pg/auth/resend-verification', { email });
+    return { success: true };
   },
 
   async forgotPassword(email) {

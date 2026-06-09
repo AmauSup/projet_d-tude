@@ -29,7 +29,8 @@
   flex-wrap: wrap;
 }
 
-.site-footer__links button {
+.site-footer__links button,
+.site-footer__links a {
   border: none;
   background: transparent;
   color: #0284c7;
@@ -37,9 +38,13 @@
   cursor: pointer;
   transition: all 0.25s ease;
   padding: 4px 6px;
+  text-decoration: none;
+  font-size: inherit;
+  font-family: inherit;
 }
 
-.site-footer__links button:hover {
+.site-footer__links button:hover,
+.site-footer__links a:hover {
   color: #0369a1;
   transform: translateY(-2px);
 }
@@ -66,11 +71,7 @@
 }
 
 @media (max-width: 768px) {
-  .site-footer__container {
-    padding: 22px 14px;
-  }
-
-  .site-footer__links {
-    gap: 12px;
+  .site-footer {
+    display: none;
   }
 }

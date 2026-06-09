@@ -228,6 +228,13 @@ export default function Header({
                 Administration
               </button>
             )}
+            {/* Réseaux sociaux (contenu footer déplacé dans le burger sur mobile) */}
+            <div className="burger-menu__socials">
+              <a href="https://linkedin.com/company/althea-systems" target="_blank" rel="noopener noreferrer" className="burger-menu__social-link">LinkedIn</a>
+              <a href="https://x.com/altheasystems" target="_blank" rel="noopener noreferrer" className="burger-menu__social-link">X / Twitter</a>
+              <a href="https://facebook.com/altheasystems" target="_blank" rel="noopener noreferrer" className="burger-menu__social-link">Facebook</a>
+              <a href="https://youtube.com/@altheasystems" target="_blank" rel="noopener noreferrer" className="burger-menu__social-link">YouTube</a>
+            </div>
           </nav>
         )}
       </div>

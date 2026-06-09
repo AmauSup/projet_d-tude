@@ -39,14 +39,18 @@ export default function Category({
       </header>
 
       <div className="category-hero">
-        {activeCategory?.imageUrl ? (
-          <img className="category-hero__image" src={activeCategory.imageUrl} alt={activeCategory.name} />
-        ) : (
-          <div className="card__image category-hero__image" />
-        )}
+        <div className="category-hero__image-wrap">
+          {activeCategory?.imageUrl ? (
+            <img className="category-hero__image" src={activeCategory.imageUrl} alt={activeCategory.name} />
+          ) : (
+            <div className="category-hero__image category-hero__image--placeholder" />
+          )}
+          <div className="category-hero__overlay">
+            <span className="badge">{activeCategory?.heroLabel || activeCategory?.name}</span>
+            <h2>{activeCategory?.name}</h2>
+          </div>
+        </div>
         <div className="category-hero__content">
-          <span className="badge">{activeCategory?.heroLabel || activeCategory?.name}</span>
-          <h2>{activeCategory?.name}</h2>
           <p>{activeCategory?.description}</p>
         </div>
       </div>

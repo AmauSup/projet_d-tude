@@ -1,3 +1,97 @@
+/* --- Carrousel --- */
+.home-carousel-wrapper {
+  position: relative;
+  margin-bottom: 34px;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.home-slide--single {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  min-height: 220px;
+  border: 1px solid #dbeafe;
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.18), transparent 32%),
+    linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+  border-radius: 22px;
+  padding: 32px 80px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.home-slide__img {
+  width: 180px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.home-slide__content h3 {
+  margin-top: 12px;
+  margin-bottom: 14px;
+  color: #0f172a;
+  font-size: 1.4rem;
+}
+
+.home-slide__content p {
+  color: #334155;
+  margin-bottom: 22px;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: background 0.2s;
+  z-index: 2;
+}
+
+.carousel-arrow:hover { background: #fff; }
+.carousel-arrow--prev { left: 12px; }
+.carousel-arrow--next { right: 12px; }
+
+.carousel-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.carousel-dot.is-active {
+  background: #0284c7;
+  transform: scale(1.3);
+}
+
+/* Ancien style grille conservé pour rétrocompatibilité */
 .home-carousel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -67,5 +161,23 @@
 
   .home-slide {
     padding: 20px;
+  }
+
+  .home-slide--single {
+    flex-direction: column;
+    padding: 24px 48px 40px;
+    min-height: unset;
+    gap: 16px;
+  }
+
+  .home-slide__img {
+    width: 100%;
+    height: 160px;
+  }
+
+  .carousel-arrow {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
   }
 }

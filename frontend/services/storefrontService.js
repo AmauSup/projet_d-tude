@@ -39,6 +39,19 @@ function normalizeProduct(p) {
   };
 }
 
+function normalizeCarouselSlide(s) {
+  return {
+    id: String(s.id),
+    title: s.title || '',
+    text: s.subtitle || s.text || '',
+    badge: s.badge || '',
+    imageUrl: s.image_url || s.imageUrl || '',
+    ctaLabel: s.cta_label || s.ctaLabel || 'Voir la catégorie',
+    categorySlug: s.link_url || s.categorySlug || '',
+    orderIndex: s.order_index ?? s.orderIndex ?? 0,
+  };
+}
+
 function normalizeCategory(c) {
   return {
     id: c.id,
@@ -57,7 +70,10 @@ export const storefrontService = {
       return {
         products: (data.products || []).map(normalizeProduct),
         categories: (data.categories || []).map(normalizeCategory),
-        homeContent: data.homeContent || { fixedMessage: '', carousel: [] },
+        homeContent: {
+          fixedMessage: data.homeContent?.fixedMessage || '',
+          carousel: (data.homeContent?.carousel || []).map(normalizeCarouselSlide),
+        },
       };
     } catch (pgErr) {
       console.warn('[storefront] PG indisponible, fallback db.json:', pgErr.message);
@@ -65,7 +81,10 @@ export const storefrontService = {
       return {
         products: (data.products || []).map(normalizeProduct),
         categories: (data.categories || []).map(normalizeCategory),
-        homeContent: data.homeContent || { fixedMessage: '', carousel: [] },
+        homeContent: {
+          fixedMessage: data.homeContent?.fixedMessage || '',
+          carousel: (data.homeContent?.carousel || []).map(normalizeCarouselSlide),
+        },
       };
     }
   },

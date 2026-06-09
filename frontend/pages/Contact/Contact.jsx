@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './Contact.css';
+import { supportService } from '../../services/supportService.js';
 
 function validateForm(form) {
 	const errors = {};
@@ -23,8 +24,10 @@ export default function Contact() {
 	const [form, setForm] = useState({ name: '', email: '', subject: 'support', message: '' });
 	const [errors, setErrors] = useState({});
 	const [messageSent, setMessageSent] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
+	const [submitError, setSubmitError] = useState('');
 
-	const handleSubmit = (event) => {
+	const handleSubmit = async (event) => {
 		event.preventDefault();
 		const nextErrors = validateForm(form);
 
@@ -34,8 +37,16 @@ export default function Contact() {
 		}
 
 		setErrors({});
-		setMessageSent(true);
-		// Backend hook: POST /api/support/contact with { name, email, subject, message }
+		setSubmitting(true);
+		setSubmitError('');
+		try {
+			await supportService.createContactMessage(form);
+			setMessageSent(true);
+		} catch {
+			setSubmitError('Une erreur est survenue. Veuillez réessayer ou nous contacter directement par email.');
+		} finally {
+			setSubmitting(false);
+		}
 	};
 
 	if (messageSent) {
@@ -133,18 +144,29 @@ export default function Contact() {
 						) : null}
 					</div>
 
-					<button className="btn btn--primary" type="submit">Envoyer</button>
+					{submitError ? (
+						<p className="helper-text helper-text--error" role="alert">{submitError}</p>
+					) : null}
+
+					<button className="btn btn--primary" type="submit" disabled={submitting}>
+						{submitting ? 'Envoi en cours…' : 'Envoyer'}
+					</button>
 				</form>
 
 				<aside className="chatbot-placeholder">
 					<h3>Assistance rapide</h3>
-					<p>Notre assistant guide les clients sur produits, commandes et SAV.</p>
+					<p>Notre assistant virtuel répond immédiatement aux questions fréquentes sur les commandes, la livraison, les produits et les retours.</p>
 					<div className="stack">
-						<div className="panel">Questions fréquentes : livraison, disponibilité, installation.</div>
-						<div className="panel">
-							<em>Backend hook :</em> branchement prévu à une base FAQ ou à un agent conversationnel.
-						</div>
+						<div className="panel">Questions fréquentes : livraison, disponibilité, installation, SAV.</div>
 					</div>
+					<button
+						type="button"
+						className="btn btn--primary"
+						style={{ marginTop: 8 }}
+						onClick={() => document.dispatchEvent(new CustomEvent('open-chatbot'))}
+					>
+						💬 Contact Me — Ouvrir le chat
+					</button>
 				</aside>
 			</div>
 		</section>

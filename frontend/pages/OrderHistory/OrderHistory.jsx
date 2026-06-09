@@ -28,6 +28,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 	const [expanded, setExpanded] = useState(null);
 	const [search, setSearch] = useState('');
 	const [yearFilter, setYearFilter] = useState('all');
+	const [statusFilter, setStatusFilter] = useState('all');
 
 	const years = useMemo(() => {
 		const set = new Set(orders.map((o) => (o.createdAt ? o.createdAt.slice(0, 4) : null)).filter(Boolean));
@@ -38,6 +39,9 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 		const q = search.toLowerCase().trim();
 		return orders.filter((order) => {
 			if (yearFilter !== 'all' && order.createdAt?.slice(0, 4) !== yearFilter) return false;
+			if (statusFilter === 'active' && order.status === 'Annulée') return false;
+			if (statusFilter === 'cancelled' && order.status !== 'Annulée') return false;
+			if (statusFilter === 'delivered' && order.status !== 'Livrée') return false;
 			if (!q) return true;
 			if (order.id.toLowerCase().includes(q)) return true;
 			return order.items.some((item) => {
@@ -45,7 +49,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 				return product?.name?.toLowerCase().includes(q);
 			});
 		});
-	}, [orders, products, search, yearFilter]);
+	}, [orders, products, search, yearFilter, statusFilter]);
 
 	const byYear = useMemo(() => {
 		const map = new Map();
@@ -84,6 +88,18 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 					{years.map((y) => (
 						<option key={y} value={y}>{y}</option>
 					))}
+				</select>
+				<select
+					className="select"
+					style={{ width: 'auto' }}
+					value={statusFilter}
+					onChange={(e) => setStatusFilter(e.target.value)}
+					aria-label="Filtrer par statut"
+				>
+					<option value="all">Tous les statuts</option>
+					<option value="active">Actives (en cours)</option>
+					<option value="delivered">Livrées</option>
+					<option value="cancelled">Annulées</option>
 				</select>
 			</div>
 

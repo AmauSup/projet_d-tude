@@ -35,6 +35,8 @@ import AdminSupport from './pages/Admin/AdminSupport.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import TwoFAVerify from './pages/TwoFAVerify/TwoFAVerify.jsx';
+import VerifyEmail from './pages/VerifyEmail/VerifyEmail.jsx';
+import ResendVerification from './pages/ResendVerification/ResendVerification.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
 import {
   initialCart,
@@ -350,6 +352,15 @@ export default function App() {
     }
     try {
       const result = await authService.register({ firstName, lastName, email, password });
+      // Si le backend demande une confirmation par email, on ne connecte pas l'utilisateur
+      if (result.requires_confirmation) {
+        return {
+          success: true,
+          requiresConfirmation: true,
+          message: `Un e-mail de confirmation a été envoyé à ${email}. Cliquez sur le lien pour activer votre compte.`,
+        };
+      }
+      // Fallback si le backend retourne directement un token (ancienne version)
       const role = 'customer';
       setUserProfile({
         firstName,
@@ -367,9 +378,26 @@ export default function App() {
       setSession({ isAuthenticated: true, role });
       return { success: true, message: 'Compte créé avec succès. Bienvenue !' };
     } catch (err) {
-      // Le backend renvoie 'Email déjà utilisé.' pour les doublons (HTTP 409)
       return { success: false, message: err.message || 'Erreur lors de la création du compte.' };
     }
+  }, [setSession, setUserProfile, setOrders]);
+
+  const handleVerifyEmail = useCallback((data) => {
+    const role = data.user?.is_admin ? 'admin' : 'customer';
+    setSession({ isAuthenticated: true, role });
+    setUserProfile({
+      firstName: data.user?.first_name || '',
+      lastName: data.user?.last_name || '',
+      email: data.user?.email || '',
+      phone: '',
+      company: '',
+      verified: true,
+      role,
+      id: data.user?.id,
+      addresses: [],
+      paymentMethods: [],
+    });
+    setOrders([]);
   }, [setSession, setUserProfile, setOrders]);
 
   const handle2FAVerify = useCallback(async ({ user_id, otp, rememberMe }) => {
@@ -540,6 +568,16 @@ export default function App() {
     setHomeContent((previous) => ({ ...previous, fixedMessage }));
   };
 
+  const handleUpdateCarousel = (carousel) => {
+    setHomeContent((previous) => ({ ...previous, carousel }));
+  };
+
+  const handleUpdateCategory = (categoryId, changes) => {
+    setCategories((previous) =>
+      previous.map((cat) => (cat.id === categoryId ? { ...cat, ...changes } : cat)),
+    );
+  };
+
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const navItems = useMemo(
@@ -694,7 +732,13 @@ export default function App() {
           <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={navigate} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} onNavigate={navigate} />} />
           <Route path="/forgot" element={<ForgotPassword onNavigate={navigate} />} />
+          <Route path="/forgot-password" element={<ForgotPassword onNavigate={navigate} />} />
           <Route path="/reset-password" element={<ResetPassword onNavigate={navigate} />} />
+          <Route
+            path="/verify-email"
+            element={<VerifyEmail onVerified={handleVerifyEmail} onNavigate={navigate} />}
+          />
+          <Route path="/resend-verification" element={<ResendVerification onNavigate={navigate} />} />
           <Route
             path="/verify-2fa"
             element={
@@ -758,6 +802,9 @@ export default function App() {
             }
           />
 
+          {/* Alias spec : /account/orders → /orders */}
+          <Route path="/account/orders" element={<Navigate to="/orders" replace />} />
+
           <Route path="/contact" element={<Contact onNavigate={navigate} />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/legal" element={<LegalPage />} />
@@ -804,12 +851,16 @@ export default function App() {
                   onToggleFeatured={handleToggleFeatured}
                   onSetCategoryOrder={handleSetCategoryOrder}
                   onOpenProduct={handleProductNavigation}
+                  onUpdateCarousel={handleUpdateCarousel}
+                  onUpdateCategory={handleUpdateCategory}
                 />
               }
             />
 
             <Route path="users" element={<AdminUsers />} />
             <Route path="support" element={<AdminSupport />} />
+            {/* Alias spec : /admin/homepage → /admin/content/home */}
+            <Route path="homepage" element={<Navigate to="/admin/content/home" replace />} />
             <Route path="*" element={<NotFound />} />
           </Route>
 

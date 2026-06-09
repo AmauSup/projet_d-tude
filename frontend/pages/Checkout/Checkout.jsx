@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Checkout.css';
 import { formatPrice } from '../../utils/storefront.js';
 
@@ -40,6 +41,7 @@ function buildInitialPayment(user) {
 }
 
 export default function Checkout({ cartItems = [], summary, user, session, onNavigate, onPlaceOrder }) {
+	const routerNavigate = useNavigate();
 	const [step, setStep] = useState(session.isAuthenticated ? 2 : 1);
 	const [guestMode, setGuestMode] = useState(!session.isAuthenticated);
 	const [address, setAddress] = useState(buildInitialAddress(user));
@@ -121,8 +123,8 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 						<>
 							<p>Vous pouvez vous connecter, créer un compte ou continuer en tant qu’invité.</p>
 							<div className="inline-actions">
-								<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/login')}>Se connecter</button>
-								<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/register')}>Créer un compte</button>
+								<button className="btn btn--secondary" type="button" onClick={() => routerNavigate('/login', { state: { from: '/checkout' } })}>Se connecter</button>
+								<button className="btn btn--secondary" type="button" onClick={() => routerNavigate('/register', { state: { from: '/checkout' } })}>Créer un compte</button>
 							</div>
 							<label><input type="checkbox" checked={guestMode} onChange={(event) => setGuestMode(event.target.checked)} /> Continuer en tant qu’invité</label>
 						</>

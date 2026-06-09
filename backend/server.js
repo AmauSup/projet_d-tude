@@ -73,6 +73,19 @@ app.locals.jwtExpires = JWT_EXPIRES;
 // avant le premier démarrage. Les migrations auto sont supprimées pour éviter les effets de bord.
 pool.query('SELECT 1').then(() => console.info('[DB] Connexion PostgreSQL établie.')).catch((e) => console.error('[DB] Connexion échouée :', e.message));
 
+// Migration incrémentale : ajout email_verified + table de tokens de vérification + type message chatbot
+pool.query(`
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE;
+  CREATE TABLE IF NOT EXISTS email_verification_token (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ
+  );
+  ALTER TABLE contact_message ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'contact';
+`).catch((e) => console.warn('[DB migration email_verified]', e.message));
+
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
@@ -156,16 +169,23 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
     if (existing.rows.length > 0) return res.status(409).json({ message: 'Email déjà utilisé.' });
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      'INSERT INTO users (email, password, last_name, first_name) VALUES ($1, $2, $3, $4) RETURNING id, email, last_name, first_name, is_admin',
+      'INSERT INTO users (email, password, last_name, first_name, email_verified) VALUES ($1, $2, $3, $4, FALSE) RETURNING id, email, last_name, first_name, is_admin',
       [email.toLowerCase().trim(), hash, last_name, first_name],
     );
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-    mailer.sendWelcome(user).catch((e) => console.warn('[mailer welcome]', e.message));
+    // Créer un token de vérification valable 24h
+    const verificationToken = require('node:crypto').randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query(
+      'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, verificationToken, verificationExpires],
+    );
+    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    mailer.sendEmailVerification(user, verifyLink).catch((e) => console.warn('[mailer verify]', e.message));
     return res.status(201).json({
       success: true,
-      token,
-      user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name, role: user.is_admin ? 'admin' : 'customer', is_admin: user.is_admin },
+      requires_confirmation: true,
+      user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name },
     });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ message: 'Email déjà utilisé.' });
@@ -187,6 +207,14 @@ app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) =
     if (!user) return res.status(401).json({ message: 'Identifiants invalides.' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ message: 'Identifiants invalides.' });
+
+    // Vérification email obligatoire avant connexion
+    if (user.email_verified === false) {
+      return res.status(403).json({
+        message: 'Compte non confirmé. Veuillez cliquer sur le lien reçu par e-mail pour activer votre compte.',
+        unconfirmed: true,
+      });
+    }
 
     // Les admins doivent valider un OTP par email
     if (user.is_admin) {
@@ -228,6 +256,56 @@ app.post('/api/pg/auth/verify-2fa', rateLimit(15 * 60 * 1000, 10), async (req, r
     token,
     user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name, role: 'admin', is_admin: true },
   });
+});
+
+// Vérification email (clic sur le lien reçu par mail)
+app.get('/api/pg/auth/verify-email', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ message: 'Token manquant.' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM email_verification_token WHERE token=$1 AND used_at IS NULL AND expires_at > NOW()',
+      [token],
+    );
+    if (!rows[0]) return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+    await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1', [rows[0].user_id]);
+    await pool.query('UPDATE email_verification_token SET used_at=NOW() WHERE id=$1', [rows[0].id]);
+    const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id=$1', [rows[0].user_id]);
+    const user = userRows[0];
+    const jwtToken = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    mailer.sendWelcome(user).catch((e) => console.warn('[mailer welcome]', e.message));
+    return res.json({
+      success: true,
+      token: jwtToken,
+      user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name, role: user.is_admin ? 'admin' : 'customer', is_admin: user.is_admin },
+    });
+  } catch (err) {
+    console.error('[verify-email]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Renvoi du lien de vérification email
+app.post('/api/pg/auth/resend-verification', rateLimit(15 * 60 * 1000, 5), async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: 'Email requis.' });
+  try {
+    const { rows } = await pool.query('SELECT * FROM users WHERE email=$1 AND email_verified=FALSE', [email.toLowerCase().trim()]);
+    if (!rows[0]) return res.json({ success: true }); // Pas de révélation si l'email existe
+    const user = rows[0];
+    const verificationToken = require('node:crypto').randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query(
+      'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, verificationToken, verificationExpires],
+    );
+    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    mailer.sendEmailVerification(user, verifyLink).catch((e) => console.warn('[mailer resend-verify]', e.message));
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[resend-verification]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
 });
 
 // Profil
@@ -836,6 +914,23 @@ app.get('/api/pg/admin/stats', authenticateToken, requireAdmin, adminRateLimit, 
   }
 });
 
+// Escalade chatbot vers agent humain — sauvegarde la conversation dans contact_message
+app.post('/api/pg/support/chatbot-escalate', async (req, res) => {
+  const { email, transcript } = req.body;
+  if (!transcript) return res.status(400).json({ message: 'Transcription requise.' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO contact_message (email, subject, message, message_type, created_at)
+       VALUES ($1, $2, $3, 'chatbot', NOW()) RETURNING id`,
+      [email || 'anonyme@chatbot', 'Escalade chatbot — demande agent humain', transcript],
+    );
+    return res.status(201).json({ success: true, id: rows[0].id });
+  } catch (err) {
+    console.error('[chatbot-escalate]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
 // --- ADMIN MESSAGES CONTACT ---
 app.get('/api/pg/admin/messages', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
@@ -1247,6 +1342,78 @@ app.delete('/api/pg/auth/addresses/:id', authenticateToken, async (req, res) => 
     return res.json({ success: true });
   } catch (err) {
     console.error('[address delete]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// --- MÉTHODES DE PAIEMENT (last4 uniquement, jamais de PAN brut) ---
+app.get('/api/pg/auth/payment-methods', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, provider, last4, expiry_month, expiry_year, cardholder_name, is_default, created_at FROM payment_method WHERE user_id=$1 ORDER BY is_default DESC, created_at DESC',
+      [req.user.id],
+    );
+    return res.json({ success: true, paymentMethods: rows });
+  } catch (err) {
+    console.error('[payment-methods get]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/pg/auth/payment-methods', authenticateToken, async (req, res) => {
+  const { cardholder_name, card_number, expiry, is_default } = req.body;
+  if (!cardholder_name || !card_number || !expiry) {
+    return res.status(400).json({ message: 'Nom, numéro de carte et expiration sont obligatoires.' });
+  }
+  const cleanNumber = String(card_number).replace(/\s/g, '');
+  if (!/^\d{13,19}$/.test(cleanNumber)) {
+    return res.status(400).json({ message: 'Numéro de carte invalide.' });
+  }
+  const last4 = cleanNumber.slice(-4);
+  const [monthStr, yearStr] = String(expiry).split('/');
+  const expiryMonth = parseInt(monthStr, 10);
+  const expiryYear = parseInt(yearStr?.length === 2 ? `20${yearStr}` : yearStr, 10);
+  if (!expiryMonth || expiryMonth < 1 || expiryMonth > 12 || !expiryYear) {
+    return res.status(400).json({ message: 'Date d\'expiration invalide (format MM/AA).' });
+  }
+  try {
+    if (is_default) {
+      await pool.query('UPDATE payment_method SET is_default=FALSE WHERE user_id=$1', [req.user.id]);
+    }
+    const setDefault = is_default || false;
+    const { rows } = await pool.query(
+      `INSERT INTO payment_method (user_id, provider, last4, expiry_month, expiry_year, cardholder_name, is_default)
+       VALUES ($1, 'card', $2, $3, $4, $5, $6) RETURNING id, provider, last4, expiry_month, expiry_year, cardholder_name, is_default, created_at`,
+      [req.user.id, last4, expiryMonth, expiryYear, cardholder_name.trim(), setDefault],
+    );
+    return res.status(201).json({ success: true, paymentMethod: rows[0] });
+  } catch (err) {
+    console.error('[payment-methods post]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.patch('/api/pg/auth/payment-methods/:id/default', authenticateToken, async (req, res) => {
+  try {
+    const own = await pool.query('SELECT id FROM payment_method WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if (!own.rows[0]) return res.status(404).json({ message: 'Méthode de paiement introuvable.' });
+    await pool.query('UPDATE payment_method SET is_default=FALSE WHERE user_id=$1', [req.user.id]);
+    await pool.query('UPDATE payment_method SET is_default=TRUE WHERE id=$1', [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[payment-methods default]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.delete('/api/pg/auth/payment-methods/:id', authenticateToken, async (req, res) => {
+  try {
+    const own = await pool.query('SELECT id FROM payment_method WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if (!own.rows[0]) return res.status(404).json({ message: 'Méthode de paiement introuvable.' });
+    await pool.query('DELETE FROM payment_method WHERE id=$1', [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[payment-methods delete]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
 });

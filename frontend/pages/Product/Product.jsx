@@ -1,6 +1,74 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import './Product.css';
 import { formatPrice } from '../../utils/storefront.js';
+
+function ImageCarousel({ images, name }) {
+  const [index, setIndex] = useState(0);
+
+  if (!images || images.length === 0) {
+    return <div className="product-main-image" aria-label={`Image de ${name}`} />;
+  }
+
+  const prev = () => setIndex((i) => (i === 0 ? images.length - 1 : i - 1));
+  const next = () => setIndex((i) => (i === images.length - 1 ? 0 : i + 1));
+
+  return (
+    <div className="product-gallery">
+      <div className="product-carousel">
+        <img
+          className="product-carousel__main"
+          src={images[index]}
+          alt={`${name} — vue ${index + 1}`}
+        />
+        {images.length > 1 && (
+          <>
+            <button type="button" className="carousel-arrow carousel-arrow--prev" onClick={prev} aria-label="Image précédente">‹</button>
+            <button type="button" className="carousel-arrow carousel-arrow--next" onClick={next} aria-label="Image suivante">›</button>
+            <div className="product-carousel__thumbs">
+              {images.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  className={`product-carousel__thumb ${i === index ? 'is-active' : ''}`}
+                  onClick={() => setIndex(i)}
+                  aria-label={`Vue ${i + 1}`}
+                  aria-pressed={i === index}
+                >
+                  <img src={src} alt="" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ImageCarousel.propTypes = {
+  images: PropTypes.arrayOf(PropTypes.string),
+  name: PropTypes.string,
+};
+
+Product.propTypes = {
+  product: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    name: PropTypes.string,
+    description: PropTypes.string,
+    shortDescription: PropTypes.string,
+    priceCents: PropTypes.number,
+    availableStock: PropTypes.number,
+    technicalFeatures: PropTypes.arrayOf(PropTypes.string),
+    images: PropTypes.arrayOf(PropTypes.string),
+    image: PropTypes.string,
+    slug: PropTypes.string,
+  }),
+  relatedProducts: PropTypes.array,
+  onAddToCart: PropTypes.func.isRequired,
+  onBuyNow: PropTypes.func.isRequired,
+  onOpenProduct: PropTypes.func.isRequired,
+};
 
 export default function Product({
   product,
@@ -10,6 +78,14 @@ export default function Product({
   onOpenProduct,
 }) {
   const isAvailable = useMemo(() => product?.availableStock > 0, [product]);
+
+  // Construit la liste des images : tableau `images` en priorité, sinon `image` seul
+  const images = useMemo(() => {
+    if (!product) return [];
+    if (Array.isArray(product.images) && product.images.length > 0) return product.images;
+    if (product.image) return [product.image];
+    return [];
+  }, [product]);
 
   if (!product) {
     return (
@@ -22,9 +98,7 @@ export default function Product({
   return (
     <section className="page product-page">
       <div className="product-layout">
-        <div className="product-gallery">
-          <div className="product-main-image" />
-        </div>
+        <ImageCarousel images={images} name={product.name} />
 
         <div className="product-info">
           <span className="badge">Dispositif médical</span>
@@ -44,7 +118,7 @@ export default function Product({
           <article className="panel">
             <h3>Caractéristiques techniques</h3>
             <ul className="product-features">
-              {product.technicalFeatures.map((feature) => (
+              {(product.technicalFeatures || []).map((feature) => (
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
@@ -74,18 +148,17 @@ export default function Product({
 
       <section className="home-section">
         <h2>Produits similaires</h2>
-        <p className="page__subtitle">
-          Même catégorie, priorité aux produits immédiatement achetables.
-        </p>
-
         <div className="card-grid">
           {relatedProducts.map((relatedProduct) => (
             <article className="card" key={relatedProduct.id}>
-              <div className="card__image" />
+              {relatedProduct.image ? (
+                <img className="card__image" src={relatedProduct.image} alt={relatedProduct.name} />
+              ) : (
+                <div className="card__image" />
+              )}
               <h3>{relatedProduct.name}</h3>
               <p>{relatedProduct.shortDescription}</p>
               <strong>{formatPrice(relatedProduct.priceCents)}</strong>
-
               <button
                 className="btn btn--secondary"
                 type="button"

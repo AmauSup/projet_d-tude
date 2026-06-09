@@ -11,13 +11,19 @@ export default function Login({ onLogin, onNavigate }) {
 	const [rememberMe, setRememberMe] = useState(false);
 	const [message, setMessage] = useState('');
 
-	const handleSubmit = (event) => {
-		event.preventDefault();
-		const result = onLogin({ email, password });
-		setMessage(result.message);
+	const [loading, setLoading] = useState(false);
 
-		if (result.success) {
-			onNavigate(from);
+	const handleSubmit = async (event) => {
+		event.preventDefault();
+		setLoading(true);
+		try {
+			const result = await onLogin({ email, password, rememberMe });
+			setMessage(result.message);
+			if (result.success) {
+				onNavigate(from);
+			}
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -81,8 +87,8 @@ export default function Login({ onLogin, onNavigate }) {
 					<button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/register')}>
 						Créer un compte
 					</button>
-					<button className="btn btn--primary auth-action" type="submit">
-						Se connecter
+					<button className="btn btn--primary auth-action" type="submit" disabled={loading}>
+						{loading ? 'Connexion…' : 'Se connecter'}
 					</button>
 				</div>
 			</form>

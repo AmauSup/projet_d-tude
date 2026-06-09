@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 
 const routes = require('./routes');
+const mailer = require('./mailer');
 
 const app = express();
 app.disable('x-powered-by');
@@ -67,36 +68,10 @@ app.locals.pool = pool;
 app.locals.jwtSecret = JWT_SECRET;
 app.locals.jwtExpires = JWT_EXPIRES;
 
-// Migrations auto au démarrage
-pool.query(`
-  ALTER TABLE product ADD COLUMN IF NOT EXISTS featured INT NOT NULL DEFAULT 0;
-  ALTER TABLE product ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
-  CREATE TABLE IF NOT EXISTS user_address (
-    id          SERIAL PRIMARY KEY,
-    user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    label       VARCHAR(100),
-    type        VARCHAR(20) NOT NULL DEFAULT 'shipping',
-    first_name  VARCHAR(100),
-    last_name   VARCHAR(100),
-    address1    VARCHAR(255) NOT NULL DEFAULT '',
-    address2    VARCHAR(255),
-    city        VARCHAR(100) NOT NULL DEFAULT '',
-    postal_code VARCHAR(20),
-    region      VARCHAR(100),
-    country     VARCHAR(100) NOT NULL DEFAULT 'France',
-    phone       VARCHAR(30),
-    email       VARCHAR(255),
-    is_default  BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-  CREATE TABLE IF NOT EXISTS admin_log (
-    id         SERIAL PRIMARY KEY,
-    admin_id   INT REFERENCES users(id) ON DELETE SET NULL,
-    action     VARCHAR(255) NOT NULL,
-    target     VARCHAR(255),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`).catch((e) => console.warn('[startup migration]', e.message));
+// Les migrations de schéma sont gérées par les fichiers SQL dans /database/
+// Exécuter 003_postgres_schema.sql puis 004_incremental_migration.sql puis 005_consolidation.sql
+// avant le premier démarrage. Les migrations auto sont supprimées pour éviter les effets de bord.
+pool.query('SELECT 1').then(() => console.info('[DB] Connexion PostgreSQL établie.')).catch((e) => console.error('[DB] Connexion échouée :', e.message));
 
 async function logAdmin(adminId, action, target) {
   await pool.query(
@@ -105,9 +80,6 @@ async function logAdmin(adminId, action, target) {
   ).catch((e) => console.warn('[admin_log]', e.message));
 }
 
-function simulateEmail(type, to, data) {
-  console.info(`[EMAIL SIMULATION] type=${type} to=${to}`, JSON.stringify(data));
-}
 
 // Middleware JWT partagé
 function authenticateToken(req, res, next) {
@@ -124,13 +96,40 @@ function authenticateToken(req, res, next) {
 // Expose pour les routes modulaires
 app.locals.authenticateToken = authenticateToken;
 
-// =====================================================================
-// Routes modulaires (routes/ folder — db.json + nouveaux endpoints)
-// =====================================================================
-app.use('/api', routes);
+// Statuts de commande valides
+const ORDER_STATUSES = ['En préparation', 'Confirmée', 'Expédiée', 'Livrée', 'Annulée'];
+
+// Middleware admin réutilisable
+function requireAdmin(req, res, next) {
+  if (!req.user?.is_admin) return res.status(403).json({ message: 'Accès réservé aux administrateurs.' });
+  return next();
+}
+
+// Rate limiter admin (plus strict pour les mutations)
+const adminRateLimit = rateLimit(15 * 60 * 1000, 200);
 
 // =====================================================================
-// Routes PostgreSQL directes (auth, produits publics, admin legacy)
+// Routes modulaires legacy (db.json) — DÉSACTIVÉES
+// Toutes les données transitent désormais par PostgreSQL via /api/pg/*
+// Conserver le montage uniquement en mode développement pour diagnostic.
+// =====================================================================
+if (process.env.ENABLE_LEGACY_ROUTES === 'true') {
+  app.use('/api/legacy', routes);
+  console.warn('[Althea] Routes legacy db.json montées sur /api/legacy (ENABLE_LEGACY_ROUTES=true)');
+} else {
+  // Renvoyer 410 Gone sur toute route /api/* non capturée par les routes pg ci-dessous
+  app.use('/api', (req, res, next) => {
+    if (!req.path.startsWith('/pg/')) {
+      return res.status(410).json({
+        message: 'Ces routes ont été migrées vers /api/pg/*. Veuillez mettre à jour vos appels.',
+      });
+    }
+    return next();
+  });
+}
+
+// =====================================================================
+// Routes PostgreSQL directes (seules routes actives en production)
 // =====================================================================
 
 // --- AUTH ---
@@ -162,7 +161,7 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
     );
     const user = result.rows[0];
     const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-    simulateEmail('welcome', user.email, { first_name: user.first_name });
+    mailer.sendWelcome(user).catch((e) => console.warn('[mailer welcome]', e.message));
     return res.status(201).json({
       success: true,
       token,
@@ -176,6 +175,9 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
 });
 
 // Connexion
+// Stockage en mémoire des OTP admin (userId → { otp, expires, user })
+const adminOtpStore = new Map();
+
 app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: 'Email et mot de passe requis.' });
@@ -185,6 +187,16 @@ app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) =
     if (!user) return res.status(401).json({ message: 'Identifiants invalides.' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ message: 'Identifiants invalides.' });
+
+    // Les admins doivent valider un OTP par email
+    if (user.is_admin) {
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+      adminOtpStore.set(user.id, { otp, expires, user });
+      mailer.sendAdminOtp(user, otp).catch((e) => console.warn('[mailer 2fa]', e.message));
+      return res.json({ success: true, requires_2fa: true, user_id: user.id });
+    }
+
     const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     return res.json({
       success: true,
@@ -195,6 +207,27 @@ app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) =
     console.error('[login]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
+});
+
+// Vérification OTP 2FA admin
+app.post('/api/pg/auth/verify-2fa', rateLimit(15 * 60 * 1000, 10), async (req, res) => {
+  const { user_id, otp } = req.body;
+  if (!user_id || !otp) return res.status(400).json({ message: 'user_id et otp requis.' });
+  const entry = adminOtpStore.get(Number(user_id));
+  if (!entry) return res.status(401).json({ message: 'Code expiré ou invalide.' });
+  if (Date.now() > entry.expires) {
+    adminOtpStore.delete(Number(user_id));
+    return res.status(401).json({ message: 'Code expiré. Reconnectez-vous.' });
+  }
+  if (entry.otp !== String(otp).trim()) return res.status(401).json({ message: 'Code incorrect.' });
+  adminOtpStore.delete(Number(user_id));
+  const { user } = entry;
+  const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  return res.json({
+    success: true,
+    token,
+    user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name, role: 'admin', is_admin: true },
+  });
 });
 
 // Profil
@@ -292,10 +325,12 @@ app.get('/api/pg/admin/products', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
   try {
     const { rows } = await pool.query(`
-      SELECT p.*, pt.name, pt.description, pt.characteristics
+      SELECT p.*, pt.name, pt.description, pt.characteristics,
+             c.name AS category_name
       FROM product p
       LEFT JOIN product_translation pt ON pt.product_id = p.id
       LEFT JOIN language l ON pt.language_id = l.id AND l.code = 'fr'
+      LEFT JOIN category c ON c.id = p.category_id
       WHERE p.deleted_at IS NULL
       ORDER BY p.created_at DESC
     `);
@@ -373,14 +408,33 @@ app.put('/api/pg/admin/products/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/pg/admin/products/:id', authenticateToken, async (req, res) => {
-  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+app.delete('/api/pg/admin/products/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await pool.query('UPDATE product SET deleted_at = NOW() WHERE id = $1', [req.params.id]);
     logAdmin(req.user.id, 'delete_product', `product:${req.params.id}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin delete product]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// GET produit individuel (admin)
+app.get('/api/pg/admin/products/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT p.*, pt.name, pt.description, pt.characteristics,
+             c.name AS category_name, c.slug AS category_slug
+      FROM product p
+      LEFT JOIN product_translation pt ON pt.product_id = p.id
+      LEFT JOIN language l ON pt.language_id = l.id AND l.code = 'fr'
+      LEFT JOIN category c ON c.id = p.category_id
+      WHERE p.id = $1 AND p.deleted_at IS NULL
+    `, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'Produit introuvable.' });
+    return res.json({ success: true, product: rows[0] });
+  } catch (err) {
+    console.error('[admin product detail]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
@@ -415,12 +469,19 @@ app.get('/api/pg/admin/orders/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/pg/admin/orders/:id/status', authenticateToken, async (req, res) => {
-  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+app.put('/api/pg/admin/orders/:id/status', authenticateToken, requireAdmin, async (req, res) => {
   const { status } = req.body;
   if (!status) return res.status(400).json({ message: 'Statut requis.' });
+  if (!ORDER_STATUSES.includes(status)) {
+    return res.status(400).json({ message: `Statut invalide. Valeurs acceptées : ${ORDER_STATUSES.join(', ')}.` });
+  }
   try {
-    await pool.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [status, req.params.id]);
+    const result = await pool.query(
+      'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+      [status, req.params.id],
+    );
+    if (!result.rows[0]) return res.status(404).json({ message: 'Commande introuvable.' });
+    logAdmin(req.user.id, 'update_order_status', `order:${req.params.id}:${status}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin order status]', err.message);
@@ -457,6 +518,93 @@ app.get('/api/pg/orders', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[user orders]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Téléchargement de la facture PDF d'une commande
+app.get('/api/pg/orders/:id/invoice', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT o.*, u.first_name, u.last_name, u.email FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1',
+      [req.params.id],
+    );
+    const order = rows[0];
+    if (!order) return res.status(404).json({ message: 'Commande introuvable.' });
+    // Vérifier que la commande appartient à l'utilisateur (ou qu'il est admin)
+    if (order.user_id !== req.user.id && !req.user.is_admin) {
+      return res.status(403).json({ message: 'Accès refusé.' });
+    }
+    const { rows: items } = await pool.query(
+      `SELECT oi.quantity, oi.unit_price, oi.line_total,
+              COALESCE(pt.name, p.slug) AS product_name
+       FROM order_item oi
+       JOIN product p ON p.id = oi.product_id
+       LEFT JOIN product_translation pt ON pt.product_id = p.id
+       LEFT JOIN language l ON l.id = pt.language_id AND l.code = 'fr'
+       WHERE oi.order_id = $1`,
+      [order.id],
+    );
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="facture-${order.id}.pdf"`);
+    doc.pipe(res);
+
+    // En-tête
+    doc.fontSize(20).text('Althea Systems', { align: 'left' });
+    doc.fontSize(10).fillColor('#666').text('Matériel médical professionnel', { align: 'left' });
+    doc.moveDown();
+    doc.fillColor('#000').fontSize(16).text(`Facture n° ${order.id}`, { align: 'right' });
+    doc.fontSize(10).text(`Date : ${new Date(order.created_at).toLocaleDateString('fr-FR')}`, { align: 'right' });
+    doc.moveDown(2);
+
+    // Informations client
+    doc.fontSize(11).text('Facturé à :', { underline: true });
+    doc.fontSize(10).text(`${order.first_name} ${order.last_name}`);
+    doc.text(order.email);
+    if (order.billing_address) {
+      const addr = typeof order.billing_address === 'string' ? JSON.parse(order.billing_address) : order.billing_address;
+      if (addr.address1) doc.text(addr.address1);
+      if (addr.city) doc.text(`${addr.postal_code || ''} ${addr.city}`);
+      if (addr.country) doc.text(addr.country);
+    }
+    doc.moveDown();
+
+    // Tableau produits
+    doc.fontSize(11).text('Détail de la commande :', { underline: true });
+    doc.moveDown(0.5);
+    const tableTop = doc.y;
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Produit', 50, tableTop);
+    doc.text('Qté', 340, tableTop);
+    doc.text('P.U.', 390, tableTop);
+    doc.text('Total', 460, tableTop);
+    doc.font('Helvetica');
+    doc.moveDown(0.3);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+
+    let y = doc.y + 5;
+    for (const item of items) {
+      doc.text(item.product_name || '—', 50, y, { width: 280 });
+      doc.text(String(item.quantity), 340, y);
+      doc.text(`${Number(item.unit_price || 0).toFixed(2)} €`, 390, y);
+      doc.text(`${Number(item.line_total || 0).toFixed(2)} €`, 460, y);
+      y += 20;
+    }
+
+    doc.moveTo(50, y).lineTo(550, y).stroke();
+    y += 8;
+    doc.fontSize(11).font('Helvetica-Bold').text(`Total TTC : ${Number(order.total_amount || 0).toFixed(2)} €`, 390, y);
+
+    doc.moveDown(3);
+    doc.fontSize(9).font('Helvetica').fillColor('#888').text('Althea Systems — TVA 20% incluse — Document généré automatiquement', { align: 'center' });
+
+    doc.end();
+  } catch (err) {
+    console.error('[invoice]', err.message);
+    if (!res.headersSent) res.status(500).json({ message: 'Erreur génération facture.' });
   }
 });
 
@@ -515,17 +663,23 @@ app.post('/api/pg/orders', authenticateToken, async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Enregistrement de la transaction de paiement (simulée)
+    pool.query(
+      `INSERT INTO payment_transaction (order_id, provider, status, amount, reference)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [order.id, 'simulated', 'completed', total, `SIM-${order.id}-${Date.now()}`],
+    ).catch((e) => console.warn('[payment_transaction insert]', e.message));
+
     // Email de confirmation commande (simulé)
     try {
       const userRes = await pool.query('SELECT email, first_name FROM users WHERE id=$1', [req.user.id]);
       const u = userRes.rows[0];
       if (u) {
-        simulateEmail('order_confirmation', u.email, {
-          first_name: u.first_name,
-          order_id: order.id,
-          total: total,
-          items: validatedItems.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
-        });
+        mailer.sendOrderConfirmation(u, {
+          id: order.id,
+          total_amount: total,
+          items: validatedItems.map((i) => ({ product_id: i.productId, quantity: i.quantity, line_total: i.price * i.quantity })),
+        }).catch((e) => console.warn('[mailer order]', e.message));
       }
     } catch (emailErr) {
       console.warn('[order email]', emailErr.message);
@@ -587,46 +741,92 @@ app.put('/api/pg/auth/password', authenticateToken, async (req, res) => {
   }
 });
 
-// --- ADMIN STATS (PostgreSQL) ---
-app.get('/api/pg/admin/stats', authenticateToken, async (req, res) => {
-  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+// --- ADMIN STATS (PostgreSQL) — avec filtre de période ---
+// ?period=7d (défaut) | 5w | 30d | 90d
+app.get('/api/pg/admin/stats', authenticateToken, requireAdmin, adminRateLimit, async (req, res) => {
   try {
-    const [prodRes, ordRes, userRes, revRes, recentRes] = await Promise.all([
-      pool.query("SELECT COUNT(*) AS total FROM product WHERE deleted_at IS NULL"),
-      pool.query("SELECT COUNT(*) AS total FROM orders"),
-      pool.query("SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL"),
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE created_at >= NOW() - INTERVAL '30 days'"),
+    const period = req.query.period || '7d';
+
+    // Calculer l'intervalle PostgreSQL et la granularité en fonction de la période
+    let interval, labelExpr;
+    if (period === '5w') {
+      interval = '5 weeks';
+      labelExpr = "TO_CHAR(DATE_TRUNC('week', created_at), 'YYYY-WW')";
+    } else if (period === '30d') {
+      interval = '30 days';
+      labelExpr = "TO_CHAR(DATE(created_at), 'MM-DD')";
+    } else if (period === '90d') {
+      interval = '90 days';
+      labelExpr = "TO_CHAR(DATE_TRUNC('week', created_at), 'MM-DD')";
+    } else {
+      interval = '7 days';
+      labelExpr = "TO_CHAR(DATE(created_at), 'MM-DD')";
+    }
+
+    const [prodRes, ordRes, userRes, revRes, recentRes, stockRes] = await Promise.all([
+      pool.query('SELECT COUNT(*) AS total FROM product WHERE deleted_at IS NULL'),
+      pool.query('SELECT COUNT(*) AS total FROM orders'),
+      pool.query('SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL'),
+      pool.query(`SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE created_at >= NOW() - INTERVAL '30 days'`),
       pool.query(`
         SELECT o.id, o.status, o.total_amount, o.created_at,
                u.first_name, u.last_name, u.email
         FROM orders o LEFT JOIN users u ON u.id = o.user_id
         ORDER BY o.created_at DESC LIMIT 10
       `),
+      pool.query('SELECT COUNT(*) AS total FROM product WHERE stock = 0 AND deleted_at IS NULL'),
     ]);
-    // Ventes par jour sur 7 jours
-    const { rows: dailySales } = await pool.query(`
-      SELECT DATE(created_at) AS day, COUNT(*) AS orders, COALESCE(SUM(total_amount),0) AS revenue
-      FROM orders WHERE created_at >= NOW() - INTERVAL '7 days'
-      GROUP BY day ORDER BY day ASC
+
+    // Ventes par période — GROUP BY sur la même expression que SELECT pour éviter l'erreur PostgreSQL
+    const { rows: periodSales } = await pool.query(`
+      SELECT ${labelExpr} AS label,
+             COUNT(*) AS orders,
+             COALESCE(SUM(total_amount), 0) AS revenue
+      FROM orders
+      WHERE created_at >= NOW() - INTERVAL '${interval}'
+      GROUP BY ${labelExpr}
+      ORDER BY MIN(created_at) ASC
     `);
-    // Ventes par catégorie
-    const { rows: catSales } = await pool.query(`
-      SELECT c.name AS category, COUNT(oi.id) AS items_sold,
-             COALESCE(SUM(oi.line_total),0) AS revenue
+
+    // Paniers moyens par catégorie sur la période
+    const { rows: avgBasketByCat } = await pool.query(`
+      SELECT c.name AS category,
+             ROUND(AVG(oi.line_total / oi.quantity), 2) AS avg_unit_price,
+             COALESCE(SUM(oi.line_total), 0) AS total_revenue,
+             COUNT(DISTINCT oi.order_id) AS order_count
       FROM order_item oi
       JOIN product p ON p.id = oi.product_id
       JOIN category c ON c.id = p.category_id
-      GROUP BY c.name ORDER BY revenue DESC
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.created_at >= NOW() - INTERVAL '${interval}'
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
     `);
+
+    // Répartition des ventes par catégorie (tous temps pour le camembert)
+    const { rows: catSales } = await pool.query(`
+      SELECT c.name AS category,
+             COUNT(oi.id) AS items_sold,
+             COALESCE(SUM(oi.line_total), 0) AS revenue
+      FROM order_item oi
+      JOIN product p ON p.id = oi.product_id
+      JOIN category c ON c.id = p.category_id
+      GROUP BY c.name
+      ORDER BY revenue DESC
+    `);
+
     return res.json({
       success: true,
+      period,
       stats: {
         products: Number(prodRes.rows[0].total),
         orders: Number(ordRes.rows[0].total),
         users: Number(userRes.rows[0].total),
         revenue30d: Number(revRes.rows[0].total),
+        outOfStockProducts: Number(stockRes.rows[0].total),
         recentOrders: recentRes.rows,
-        dailySales,
+        dailySales: periodSales,
+        avgBasketByCategory: avgBasketByCat,
         categorySales: catSales,
       },
     });
@@ -935,10 +1135,32 @@ app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (r
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      simulateEmail('reset_password', email, { token, link: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}` });
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
     }
   } catch (err) {
     console.error('[forgot-password]', err.message);
+  }
+  return res.json({ success: true, message: 'Si ce compte existe, un email a été envoyé.' });
+});
+
+// Alias pour la compatibilité avec le frontend
+app.post('/api/pg/auth/request-reset-password', rateLimit(15 * 60 * 1000, 10), async (req, res) => {
+  req.url = '/api/pg/auth/forgot-password';
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: 'Email requis.' });
+  try {
+    const { rows } = await pool.query('SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL', [email.toLowerCase().trim()]);
+    if (rows[0]) {
+      const token = require('node:crypto').randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + 60 * 60 * 1000);
+      await pool.query(
+        'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
+        [rows[0].id, token, expires],
+      );
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
+    }
+  } catch (err) {
+    console.error('[request-reset-password]', err.message);
   }
   return res.json({ success: true, message: 'Si ce compte existe, un email a été envoyé.' });
 });

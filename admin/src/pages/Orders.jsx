@@ -8,14 +8,15 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { apiFetch } from '../contexts/AuthContext';
 import OrderDetailDialog from '../components/OrderDetailDialog';
 
-const STATUS_OPTIONS = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
+// Doit correspondre exactement à ORDER_STATUSES dans server.js
+const STATUS_OPTIONS = ['En préparation', 'Confirmée', 'Expédiée', 'Livrée', 'Annulée'];
 
 const statusColors = {
-  pending: 'warning',
-  confirmed: 'info',
-  completed: 'success',
-  cancelled: 'error',
-  shipped: 'primary',
+  'En préparation': 'warning',
+  'Confirmée': 'info',
+  'Expédiée': 'primary',
+  'Livrée': 'success',
+  'Annulée': 'error',
 };
 
 export default function Orders() {

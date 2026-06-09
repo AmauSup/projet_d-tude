@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
@@ -33,6 +33,8 @@ import AdminCategories from './pages/Admin/AdminCategories.jsx';
 import AdminOrders from './pages/Admin/AdminOrders.jsx';
 import AdminSupport from './pages/Admin/AdminSupport.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
+import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
+import TwoFAVerify from './pages/TwoFAVerify/TwoFAVerify.jsx';
 import { useLocalStorage } from './hooks/useLocalStorage.js';
 import {
   initialCart,
@@ -52,8 +54,12 @@ import {
   searchProducts,
   sortProductsForCategory,
 } from './utils/storefront.js';
-import { adminService } from './services/adminService.js';
+import { authService } from './services/authService.js';
+import { storefrontService } from './services/storefrontService.js';
+import { checkoutService } from './services/checkoutService.js';
+import { apiClient, persistAuthToken } from './services/apiClient.js';
 import { useI18n } from './contexts/I18nContext.jsx';
+import Chatbot from './components/Chatbot/Chatbot.jsx';
 
 const initialSearchState = {
   query: '',
@@ -75,6 +81,24 @@ function getPasswordValidation(password) {
     /\d/.test(password) &&
     /[^A-Za-z0-9]/.test(password)
   );
+}
+
+// Convertit une commande backend (snake_case, total en €) en format frontend
+function normalizeOrder(o) {
+  return {
+    id: String(o.id),
+    createdAt: o.created_at ? String(o.created_at).slice(0, 10) : '',
+    status: o.status || 'En préparation',
+    totalCents: Math.round(Number(o.total_amount) * 100),
+    items: (o.items || []).map((item) => ({
+      productId: item.product_id,
+      quantity: Number(item.quantity),
+    })),
+    billingAddress: typeof o.billing_address === 'string'
+      ? JSON.parse(o.billing_address)
+      : (o.billing_address || {}),
+    paymentSummary: o.payment_summary || '',
+  };
 }
 
 function RequireAuth({ isAuthenticated, children }) {
@@ -101,6 +125,32 @@ function RequireAdmin({ isAuthenticated, isAdmin, children }) {
   return children;
 }
 
+// Purger les données mock au premier chargement (IDs mock = chaînes commençant par 'prod-')
+// Cette migration s'exécute une seule fois avant le premier rendu de l'app.
+(function purgeMockData() {
+  try {
+    const cartRaw = localStorage.getItem('althea-cart');
+    if (cartRaw) {
+      const cart = JSON.parse(cartRaw);
+      const cleaned = cart.filter((i) => typeof i.productId !== 'string' || !i.productId.startsWith('prod-'));
+      if (cleaned.length !== cart.length) localStorage.setItem('althea-cart', JSON.stringify(cleaned));
+    }
+    const ordersRaw = localStorage.getItem('althea-orders');
+    if (ordersRaw) {
+      const orders = JSON.parse(ordersRaw);
+      const cleaned = orders.filter((o) => typeof o.id !== 'string' || !o.id.startsWith('CMD-2026-100'));
+      if (cleaned.length !== orders.length) localStorage.setItem('althea-orders', JSON.stringify(cleaned));
+    }
+    const profileRaw = localStorage.getItem('althea-user-profile');
+    if (profileRaw) {
+      const profile = JSON.parse(profileRaw);
+      if (profile.email === 'lina.martin@cabinet-demo.fr') {
+        localStorage.removeItem('althea-user-profile');
+      }
+    }
+  } catch {}
+}());
+
 export default function App() {
   const { t } = useI18n();
   const location = useLocation();
@@ -114,13 +164,9 @@ export default function App() {
   const [userProfile, setUserProfile] = useLocalStorage('althea-user-profile', initialUser);
   const [cartItems, setCartItems] = useLocalStorage('althea-cart', initialCart);
   const [orders, setOrders] = useLocalStorage('althea-orders', initialOrders);
-  const [lastOrderId, setLastOrderId] = useLocalStorage('althea-last-order-id', initialOrders[0]?.id ?? null);
+  const [lastOrderId, setLastOrderId] = useLocalStorage('althea-last-order-id', null);
+  const [pendingAdmin2FA, setPendingAdmin2FA] = useState(null); // { userId, rememberMe }
   const [searchState, setSearchState] = useLocalStorage('althea-search-state', initialSearchState);
-  const [adminStats, setAdminStats] = useState({
-    products: products.length,
-    orders: orders.length,
-    revenue: 0,
-  });
 
   useEffect(() => {
     if (location.pathname === '/search') {
@@ -131,19 +177,33 @@ export default function App() {
     }
   }, [location.pathname, searchParams, searchState.query, setSearchState]);
 
+  // Chargement initial : catalogue depuis le backend + nettoyage du panier
   useEffect(() => {
     let mounted = true;
-
-    adminService.getStats({ products, orders }).then((stats) => {
-      if (mounted) {
-        setAdminStats(stats);
+    storefrontService.getInitialData().then((data) => {
+      if (!mounted) return;
+      if (data.products.length > 0) {
+        setProducts(data.products);
+        // Supprimer du panier les articles dont le productId n'existe pas dans le catalogue réel
+        const realIds = new Set(data.products.map((p) => p.id));
+        setCartItems((prev) => prev.filter((item) => realIds.has(item.productId)));
       }
-    });
+      if (data.categories.length > 0) setCategories(data.categories);
+      if (data.homeContent) setHomeContent(data.homeContent);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    return () => {
-      mounted = false;
-    };
-  }, [products, orders]);
+  // Restaurer les commandes depuis le backend si l'utilisateur est déjà connecté (refresh page)
+  useEffect(() => {
+    if (!session.isAuthenticated) return;
+    apiClient.get('/pg/orders')
+      .then((data) => setOrders((data.orders || []).map(normalizeOrder)))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const pathSegments = location.pathname.split('/').filter(Boolean);
 
@@ -152,7 +212,7 @@ export default function App() {
     [categories],
   );
 
-  const activeCategorySlug = pathSegments[0] === 'category' ? pathSegments[1] : sortedCategories[0]?.slug;
+  const activeCategorySlug = (pathSegments[0] === 'category' || pathSegments[0] === 'categories') ? pathSegments[1] : sortedCategories[0]?.slug;
   const activeCategory = sortedCategories.find((category) => category.slug === activeCategorySlug) || sortedCategories[0];
 
   const categoryProducts = useMemo(() => {
@@ -163,7 +223,7 @@ export default function App() {
     return sortProductsForCategory(products.filter((product) => product.categoryId === activeCategory.id));
   }, [activeCategory, products]);
 
-  const selectedProductSlug = pathSegments[0] === 'product' ? pathSegments[1] : products[0]?.slug;
+  const selectedProductSlug = (pathSegments[0] === 'product' || pathSegments[0] === 'products') ? pathSegments[1] : products[0]?.slug;
   const selectedProduct = products.find((product) => product.slug === selectedProductSlug) || products[0] || null;
 
   const relatedProducts = useMemo(() => {
@@ -204,9 +264,9 @@ export default function App() {
     });
   };
 
-  const handleCategoryNavigation = (categorySlug) => navigate(`/category/${categorySlug}`);
+  const handleCategoryNavigation = (categorySlug) => navigate(`/categories/${categorySlug}`);
 
-  const handleProductNavigation = (productSlug) => navigate(`/product/${productSlug}`);
+  const handleProductNavigation = (productSlug) => navigate(`/products/${productSlug}`);
 
   const handleHeaderSearch = (query) => {
     setSearchState((previous) => ({ ...previous, query }));
@@ -242,49 +302,94 @@ export default function App() {
     setCartItems((previous) => previous.filter((item) => item.productId !== productId));
   };
 
-  const handleLogin = ({ email, password }) => {
+  const handleLogin = useCallback(async ({ email, password, rememberMe = true }) => {
     if (!email || !password) {
       return { success: false, message: 'Veuillez renseigner votre e-mail et votre mot de passe.' };
     }
-
-    if (password.length < 8) {
-      return { success: false, message: 'Mot de passe incorrect. Pensez à utiliser le lien “mot de passe oublié”.' };
+    try {
+      const result = await authService.login({ email, password, rememberMe });
+      // Admin → 2FA requis, on redirige vers la page OTP
+      if (result.requires_2fa) {
+        setPendingAdmin2FA({ userId: result.user_id, rememberMe });
+        navigate('/verify-2fa');
+        return { success: true, message: 'Code de vérification envoyé à votre adresse e-mail.' };
+      }
+      const role = result.userRole || (result.user?.is_admin ? 'admin' : 'customer');
+      setSession({ isAuthenticated: true, role });
+      setUserProfile({
+        firstName: result.user?.first_name || '',
+        lastName: result.user?.last_name || '',
+        email: result.user?.email || email,
+        phone: '',
+        company: '',
+        verified: true,
+        role,
+        id: result.user?.id,
+        addresses: [],
+        paymentMethods: [],
+      });
+      // Charger les commandes réelles de l'utilisateur
+      apiClient.get('/pg/orders')
+        .then((data) => setOrders((data.orders || []).map(normalizeOrder)))
+        .catch(() => setOrders([]));
+      return { success: true, message: 'Connexion réussie.' };
+    } catch (err) {
+      return { success: false, message: err.message || 'Identifiants invalides.' };
     }
+  }, [setSession, setUserProfile, setOrders]);
 
-    const role = email.includes('admin') ? 'admin' : 'customer';
-    setSession({ isAuthenticated: true, role });
-    setUserProfile((previous) => ({ ...previous, email }));
-
-    return { success: true, message: 'Connexion réussie.' };
-  };
-
-  const handleRegister = ({ firstName, lastName, email, password, company }) => {
+  const handleRegister = useCallback(async ({ firstName, lastName, email, password, company }) => {
     if (!firstName || !lastName || !email) {
       return { success: false, message: 'Tous les champs obligatoires doivent être complétés.' };
     }
-
     if (!getPasswordValidation(password)) {
       return {
         success: false,
         message: 'Le mot de passe doit contenir 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
       };
     }
+    try {
+      const result = await authService.register({ firstName, lastName, email, password });
+      const role = 'customer';
+      setUserProfile({
+        firstName,
+        lastName,
+        email: result.user?.email || email,
+        phone: '',
+        company: company || '',
+        verified: true,
+        role,
+        id: result.user?.id,
+        addresses: [],
+        paymentMethods: [],
+      });
+      setOrders([]);
+      setSession({ isAuthenticated: true, role });
+      return { success: true, message: 'Compte créé avec succès. Bienvenue !' };
+    } catch (err) {
+      // Le backend renvoie 'Email déjà utilisé.' pour les doublons (HTTP 409)
+      return { success: false, message: err.message || 'Erreur lors de la création du compte.' };
+    }
+  }, [setSession, setUserProfile, setOrders]);
 
-    setUserProfile((previous) => ({
-      ...previous,
-      firstName,
-      lastName,
-      email,
-      company,
-      verified: false,
-    }));
-    setSession({ isAuthenticated: true, role: 'customer' });
-
-    return {
-      success: true,
-      message: 'Compte créé. La confirmation e-mail sera à brancher côté backend.',
-    };
-  };
+  const handle2FAVerify = useCallback(async ({ user_id, otp, rememberMe }) => {
+    const result = await authService.verify2fa({ user_id, otp, rememberMe });
+    const role = 'admin';
+    setSession({ isAuthenticated: true, role });
+    setUserProfile({
+      firstName: result.user?.first_name || '',
+      lastName: result.user?.last_name || '',
+      email: result.user?.email || '',
+      phone: '', company: '', verified: true, role,
+      id: result.user?.id,
+      addresses: [], paymentMethods: [],
+    });
+    apiClient.get('/pg/orders')
+      .then((data) => setOrders((data.orders || []).map(normalizeOrder)))
+      .catch(() => setOrders([]));
+    setPendingAdmin2FA(null);
+    navigate('/admin/dashboard');
+  }, [setSession, setUserProfile, setOrders, navigate]);
 
   const handleSaveAccount = (nextProfile) => {
     setUserProfile((previous) => ({
@@ -293,47 +398,57 @@ export default function App() {
     }));
   };
 
-  const handlePlaceOrder = ({ billingAddress, paymentDetails }) => {
+  const handlePlaceOrder = useCallback(async ({ billingAddress, paymentDetails }) => {
     if (cartSummary.unavailableCount > 0) {
       return { success: false, message: 'Retirez les produits indisponibles avant validation.' };
     }
-
     if (cartDetails.length === 0) {
       return { success: false, message: 'Votre panier est vide.' };
     }
 
+    // Si connecté, on passe par le backend (crée la commande + décrémente le stock)
+    if (session.isAuthenticated) {
+      try {
+        const order = await checkoutService.placeOrder({
+          items: cartDetails,
+          billingAddress,
+          paymentDetails,
+        });
+        const nextOrder = {
+          id: order.id,
+          createdAt: order.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+          status: order.status || 'En préparation',
+          totalCents: Math.round(Number(order.total_amount) * 100),
+          items: cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          billingAddress,
+          paymentSummary: order.payment_summary || '',
+        };
+        setOrders((previous) => [nextOrder, ...previous]);
+        setLastOrderId(nextOrder.id);
+        setCartItems([]);
+        navigate('/confirmation', { order: nextOrder.id });
+        return { success: true, message: 'Commande validée.' };
+      } catch (err) {
+        return { success: false, message: err.message || 'Erreur lors de la création de la commande.' };
+      }
+    }
+
+    // Invité : commande locale uniquement
     const nextOrder = {
       id: createOrderId(),
       createdAt: new Date().toISOString().slice(0, 10),
-      status: 'À confirmer côté paiement',
+      status: 'En attente de confirmation',
       totalCents: cartSummary.totalCents,
       items: cartDetails.map((item) => ({ productId: item.productId, quantity: item.quantity })),
       billingAddress,
       paymentSummary: `${paymentDetails.cardholderName} •••• ${paymentDetails.cardNumber.slice(-4)}`,
     };
-
     setOrders((previous) => [nextOrder, ...previous]);
     setLastOrderId(nextOrder.id);
     setCartItems([]);
-    setUserProfile((previous) => ({
-      ...previous,
-      addresses: previous.addresses?.length ? previous.addresses : [billingAddress],
-      paymentMethods: previous.paymentMethods?.length
-        ? previous.paymentMethods
-        : [
-            {
-              id: `pm-${Date.now()}`,
-              label: 'Carte enregistrée',
-              cardholderName: paymentDetails.cardholderName,
-              last4: paymentDetails.cardNumber.slice(-4),
-              expiry: paymentDetails.expiry,
-            },
-          ],
-    }));
-
     navigate('/confirmation', { order: nextOrder.id });
-    return { success: true, message: 'Commande validée.' };
-  };
+    return { success: true, message: 'Commande enregistrée (mode invité).' };
+  }, [cartSummary, cartDetails, session.isAuthenticated, setOrders, setLastOrderId, setCartItems, navigate]);
 
   const handleUpdateOrderStatus = (orderId, status) => {
     setOrders((previous) =>
@@ -341,10 +456,18 @@ export default function App() {
     );
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch {
+      persistAuthToken(null);
+    }
     setSession({ isAuthenticated: false, role: 'guest' });
+    setUserProfile(initialUser);
+    setOrders([]);
+    setCartItems([]);
     navigate('/');
-  };
+  }, [setSession, setUserProfile, setOrders, setCartItems, navigate]);
 
   const handleMoveCarouselSlide = (slideId, direction) => {
     setHomeContent((previous) => {
@@ -440,11 +563,6 @@ export default function App() {
     [session.isAuthenticated],
   );
 
-  const formattedAdminStats = {
-    ...adminStats,
-    revenueFormatted: formatPrice(adminStats.revenue || 0),
-  };
-
   return (
     <div className="app-shell">
       <Header
@@ -492,8 +610,9 @@ export default function App() {
             }
           />
 
+          {/* Route principale catégorie (pluriel) + alias singulier pour compatibilité */}
           <Route
-            path="/category/:slug"
+            path="/categories/:slug"
             element={
               <Category
                 categories={sortedCategories}
@@ -504,9 +623,11 @@ export default function App() {
               />
             }
           />
+          <Route path="/category/:slug" element={<Navigate to={`/categories/${pathSegments[1] || ''}`} replace />} />
 
+          {/* Route principale produit (pluriel) + alias singulier pour compatibilité */}
           <Route
-            path="/product/:slug"
+            path="/products/:slug"
             element={
               <Product
                 product={selectedProduct}
@@ -520,6 +641,7 @@ export default function App() {
               />
             }
           />
+          <Route path="/product/:slug" element={<Navigate to={`/products/${pathSegments[1] || ''}`} replace />} />
 
           <Route
             path="/search"
@@ -571,7 +693,19 @@ export default function App() {
 
           <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={navigate} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} onNavigate={navigate} />} />
-          <Route path="/forgot" element={<ForgotPassword />} />
+          <Route path="/forgot" element={<ForgotPassword onNavigate={navigate} />} />
+          <Route path="/reset-password" element={<ResetPassword onNavigate={navigate} />} />
+          <Route
+            path="/verify-2fa"
+            element={
+              <TwoFAVerify
+                userId={pendingAdmin2FA?.userId}
+                rememberMe={pendingAdmin2FA?.rememberMe}
+                onVerified={handle2FAVerify}
+                onNavigate={navigate}
+              />
+            }
+          />
 
           <Route
             path="/account"
@@ -592,7 +726,7 @@ export default function App() {
             path="/account/settings"
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <AccountSettings onNavigate={navigate} />
+                <AccountSettings user={userProfile} onSave={handleSaveAccount} onNavigate={navigate} />
               </RequireAuth>
             }
           />
@@ -639,24 +773,9 @@ export default function App() {
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
 
-            <Route
-              path="dashboard"
-              element={<AdminDashboard stats={formattedAdminStats} />}
-            />
+            <Route path="dashboard" element={<AdminDashboard />} />
 
-            <Route
-              path="products"
-              element={
-                <AdminProducts
-                  products={products}
-                  categories={sortedCategories}
-                  onToggleProductPriority={handleToggleProductPriority}
-                  onToggleFeatured={handleToggleFeatured}
-                  onToggleProductAvailability={handleToggleProductAvailability}
-                  onDeleteProduct={handleDeleteProduct}
-                />
-              }
-            />
+            <Route path="products" element={<AdminProducts />} />
 
             <Route
               path="categories"
@@ -668,16 +787,7 @@ export default function App() {
               }
             />
 
-            <Route
-              path="orders"
-              element={
-                <AdminOrders
-                  orders={orders}
-                  products={products}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
-                />
-              }
-            />
+            <Route path="orders" element={<AdminOrders />} />
 
             <Route
               path="content/home"
@@ -708,6 +818,7 @@ export default function App() {
       </main>
 
       <Footer onNavigate={navigate} />
+      <Chatbot />
     </div>
   );
 }

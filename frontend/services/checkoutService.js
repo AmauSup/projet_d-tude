@@ -1,19 +1,19 @@
-const wait = (ms = 160) => new Promise((resolve) => setTimeout(resolve, ms));
+import { apiClient } from './apiClient.js';
 
 export const checkoutService = {
-  async validateBeforePayment({ hasUnavailableItems, hasItems }) {
-    await wait();
-    if (hasUnavailableItems) {
-      return { valid: false, message: 'Retirez les produits indisponibles.' };
-    }
-    if (!hasItems) {
-      return { valid: false, message: 'Panier vide.' };
-    }
+  validateBeforePayment({ hasUnavailableItems, hasItems }) {
+    if (hasUnavailableItems) return { valid: false, message: 'Retirez les produits indisponibles.' };
+    if (!hasItems) return { valid: false, message: 'Panier vide.' };
     return { valid: true };
   },
-  async createPaymentIntent() {
-    await wait();
-    // Backend hook: integrate Stripe/PayPal payment intent
-    return { clientSecret: 'mock-client-secret' };
+
+  async placeOrder({ items, billingAddress, paymentDetails }) {
+    const payload = {
+      items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      billingAddress,
+      paymentDetails,
+    };
+    const data = await apiClient.post('/pg/orders', payload);
+    return data.order;
   },
 };

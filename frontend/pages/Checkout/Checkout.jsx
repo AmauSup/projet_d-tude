@@ -44,6 +44,7 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 	const [guestMode, setGuestMode] = useState(!session.isAuthenticated);
 	const [address, setAddress] = useState(buildInitialAddress(user));
 	const [payment, setPayment] = useState(buildInitialPayment(user));
+	const [demoMode, setDemoMode] = useState(true);
 	const [feedback, setFeedback] = useState('');
 
 	const cartIsReady = useMemo(() => cartItems.length > 0 && summary.unavailableCount === 0, [cartItems.length, summary.unavailableCount]);
@@ -68,21 +69,29 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 			return;
 		}
 
-		const requiredPaymentFields = ['cardholderName', 'cardNumber', 'expiry', 'cvv'];
-		const isValid = requiredPaymentFields.every((field) => payment[field]);
-
-		if (!isValid) {
-			setFeedback('Merci de compléter les informations de paiement.');
-			return;
+		if (!demoMode) {
+			const requiredPaymentFields = ['cardholderName', 'cardNumber', 'expiry', 'cvv'];
+			const isValid = requiredPaymentFields.every((field) => payment[field]);
+			if (!isValid) {
+				setFeedback('Merci de compléter les informations de paiement.');
+				return;
+			}
 		}
 
 		setFeedback('');
 		setStep(4);
 	};
 
-	const handlePlaceOrder = () => {
-		const result = onPlaceOrder({ billingAddress: address, paymentDetails: payment });
-		setFeedback(result.message);
+	const [placing, setPlacing] = useState(false);
+
+	const handlePlaceOrder = async () => {
+		setPlacing(true);
+		try {
+			const result = await onPlaceOrder({ billingAddress: address, paymentDetails: payment });
+			setFeedback(result.message);
+		} finally {
+			setPlacing(false);
+		}
 	};
 
 	return (
@@ -148,6 +157,21 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 			{step === 3 ? (
 				<div className="checkout-layout">
 					<div className="stack">
+						<div className="notice notice--warning" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+							<label style={{ fontWeight: 400, cursor: 'pointer', margin: 0 }}>
+								<input
+									type="checkbox"
+									checked={demoMode}
+									onChange={(e) => {
+										setDemoMode(e.target.checked);
+										if (e.target.checked) {
+											setPayment({ cardholderName: 'Test User', cardNumber: '4242424242424242', expiry: '12/26', cvv: '123' });
+										}
+									}}
+								/>
+								{' '}Mode démo — simuler le paiement (aucune carte débitée)
+							</label>
+						</div>
 						<div className="inline-actions">
 							{user.paymentMethods?.length ? (
 								<button className="btn btn--secondary" type="button" onClick={() => setPayment(buildInitialPayment(user))}>
@@ -157,11 +181,10 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 						</div>
 						<div className="form-grid">
 							<input className="input" placeholder="Nom sur la carte" value={payment.cardholderName} onChange={(event) => setPayment({ ...payment, cardholderName: event.target.value })} />
-							<input className="input" placeholder="Numéro de carte" value={payment.cardNumber} onChange={(event) => setPayment({ ...payment, cardNumber: event.target.value })} />
+							<input className="input" placeholder="Numéro de carte (16 chiffres)" value={payment.cardNumber} onChange={(event) => setPayment({ ...payment, cardNumber: event.target.value })} />
 							<input className="input" placeholder="Date d'expiration (MM/AA)" value={payment.expiry} onChange={(event) => setPayment({ ...payment, expiry: event.target.value })} />
 							<input className="input" placeholder="CVV" value={payment.cvv} onChange={(event) => setPayment({ ...payment, cvv: event.target.value })} />
 						</div>
-						<div className="notice notice--info">Prévu pour intégration Stripe/PayPal côté backend avec tokenisation sécurisée.</div>
 					</div>
 
 					<aside className="cart-summary">
@@ -221,8 +244,8 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 						Continuer
 					</button>
 				) : (
-					<button type="button" className="btn btn--primary" disabled={!cartIsReady} onClick={handlePlaceOrder}>
-						Confirmer l'achat
+					<button type="button" className="btn btn--primary" disabled={!cartIsReady || placing} onClick={handlePlaceOrder}>
+						{placing ? 'Traitement…' : 'Confirmer l\'achat'}
 					</button>
 				)}
 			</div>

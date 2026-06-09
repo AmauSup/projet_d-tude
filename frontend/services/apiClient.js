@@ -1,9 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 const AUTH_TOKEN_KEY = 'althea-auth-token';
 
+function getStoredToken() {
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) || window.sessionStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
 function buildHeaders(body, extraHeaders = {}) {
   const headers = { ...extraHeaders };
-  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = getStoredToken();
 
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
@@ -34,17 +38,22 @@ async function request(path, options = {}) {
   return payload;
 }
 
-export function persistAuthToken(token) {
-  if (token) {
-    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
-    return;
-  }
-
+// remember=true → localStorage (persiste après fermeture navigateur)
+// remember=false → sessionStorage (effacé à la fermeture de l'onglet)
+export function persistAuthToken(token, remember = true) {
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  if (token) {
+    if (remember) {
+      window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      window.sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+    }
+  }
 }
 
 export function getStoredAuthToken() {
-  return window.localStorage.getItem(AUTH_TOKEN_KEY) || '';
+  return getStoredToken();
 }
 
 export const apiClient = {

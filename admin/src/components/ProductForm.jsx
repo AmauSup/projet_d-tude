@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, TextField, Typography } from '@mui/material';
+import {
+  Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
+  FormControlLabel, Grid, MenuItem, Slider, TextField, Tooltip, Typography,
+} from '@mui/material';
 
 // Props: open, onClose, onSubmit, initialData, categories, languages
 export default function ProductForm({ open, onClose, onSubmit, initialData, categories, languages }) {
@@ -9,6 +12,9 @@ export default function ProductForm({ open, onClose, onSubmit, initialData, cate
       stock: 0,
       category_id: '',
       image: '',
+      slug: '',
+      priority: 0,
+      featured: 0,
       translations: languages?.map(l => ({ language_id: l.id, name: '', description: '', characteristics: '' })) || [],
     }
   );
@@ -80,11 +86,60 @@ export default function ProductForm({ open, onClose, onSubmit, initialData, cate
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Image (URL ou JSON)"
+                label="Image (URL)"
                 name="image"
                 value={form.image}
                 onChange={handleChange}
                 fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Slug (URL slug, ex: tensiometre-pro)"
+                name="slug"
+                value={form.slug || ''}
+                onChange={handleChange}
+                fullWidth
+                helperText="Laissez vide pour auto-génération"
+              />
+            </Grid>
+
+            {/* Priorité dans la catégorie */}
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" gutterBottom>
+                Priorité dans la catégorie : {form.priority}
+              </Typography>
+              <Tooltip title="0 = normal · valeur haute = affiché en premier dans la catégorie">
+                <Slider
+                  value={Number(form.priority) || 0}
+                  onChange={(_, v) => setForm(p => ({ ...p, priority: v }))}
+                  min={0} max={10} step={1}
+                  marks valueLabelDisplay="auto"
+                />
+              </Tooltip>
+            </Grid>
+
+            {/* Produit mis en avant (Top du moment) */}
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" gutterBottom>
+                Rang "Top Produits" : {form.featured}
+              </Typography>
+              <Tooltip title="0 = non mis en avant · valeur haute = en tête de la section Top Produits">
+                <Slider
+                  value={Number(form.featured) || 0}
+                  onChange={(_, v) => setForm(p => ({ ...p, featured: v }))}
+                  min={0} max={10} step={1}
+                  marks valueLabelDisplay="auto"
+                />
+              </Tooltip>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Number(form.featured) > 0}
+                    onChange={(e) => setForm(p => ({ ...p, featured: e.target.checked ? 1 : 0 }))}
+                  />
+                }
+                label="Mis en avant sur la page d'accueil"
               />
             </Grid>
           </Grid>
@@ -129,7 +184,9 @@ export default function ProductForm({ open, onClose, onSubmit, initialData, cate
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Annuler</Button>
-          <Button type="submit" variant="contained">{initialData ? 'Enregistrer' : 'Ajouter'}</Button>
+          <Button type="submit" variant="contained" color="primary">
+            {initialData ? 'Enregistrer les modifications' : 'Créer le produit'}
+          </Button>
         </DialogActions>
       </form>
     </Dialog>

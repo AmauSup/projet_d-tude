@@ -67,28 +67,43 @@ export function buildRelatedProducts(products, product, limit = 6) {
 }
 
 function getSearchRank(query, text) {
-  if (!query) {
-    return 0;
-  }
+  if (!query) return 0;
 
   const normalizedQuery = query.trim().toLowerCase();
   const normalizedText = text.toLowerCase();
+  const queryWords = normalizedQuery.split(/\s+/).filter(Boolean);
+  const textWords = normalizedText.split(/\s+/).filter(Boolean);
 
-  if (normalizedText === normalizedQuery) {
-    return 1;
-  }
+  // Correspondance exacte
+  if (normalizedText === normalizedQuery) return 1;
 
-  if (levenshteinDistance(normalizedText, normalizedQuery) === 1 || normalizedText.split(' ').some((part) => levenshteinDistance(part, normalizedQuery) === 1)) {
-    return 2;
-  }
+  // Chaque mot de la requête inclus dans le texte
+  if (queryWords.every((qw) => normalizedText.includes(qw))) return 2;
 
-  if (normalizedText.startsWith(normalizedQuery)) {
-    return 3;
-  }
+  // Préfixe exact
+  if (normalizedText.startsWith(normalizedQuery)) return 3;
 
-  if (normalizedText.includes(normalizedQuery)) {
-    return 4;
-  }
+  // Inclusion partielle
+  if (normalizedText.includes(normalizedQuery)) return 4;
+
+  // Distance Levenshtein ≤ 1 (faute de frappe simple)
+  const dist1 = levenshteinDistance(normalizedText, normalizedQuery);
+  if (dist1 <= 1) return 5;
+  if (textWords.some((tw) => levenshteinDistance(tw, normalizedQuery) <= 1)) return 5;
+
+  // Au moins un mot de la requête a une distance ≤ 1 avec un mot du texte
+  const fuzzy1 = queryWords.some((qw) =>
+    textWords.some((tw) => levenshteinDistance(tw, qw) <= 1),
+  );
+  if (fuzzy1) return 6;
+
+  // Distance Levenshtein ≤ 2 (deux fautes de frappe)
+  const dist2 = levenshteinDistance(normalizedText, normalizedQuery);
+  if (dist2 <= 2) return 7;
+  const fuzzy2 = queryWords.some((qw) =>
+    textWords.some((tw) => levenshteinDistance(tw, qw) <= 2),
+  );
+  if (fuzzy2) return 7;
 
   return 99;
 }

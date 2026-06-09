@@ -21,3 +21,53 @@
     padding: 22px 14px 36px;
   }
 }
+
+/* ---- RTL (arabe, hébreu) ---- */
+[dir="rtl"] {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  text-align: right;
+}
+
+[dir="rtl"] .site-header__container,
+[dir="rtl"] .site-header__topbar,
+[dir="rtl"] .site-header__nav,
+[dir="rtl"] .inline-actions,
+[dir="rtl"] .page-actions,
+[dir="rtl"] .cart-layout,
+[dir="rtl"] .checkout-actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .category-layout {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .form-grid {
+  direction: rtl;
+}
+
+[dir="rtl"] .breadcrumbs ol {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .site-header__search {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .burger-menu__item,
+[dir="rtl"] .site-header__burger-menu {
+  text-align: right;
+}
+
+[dir="rtl"] .card-grid {
+  direction: rtl;
+}
+
+[dir="rtl"] .admin-table {
+  direction: rtl;
+}
+
+[dir="rtl"] .panel,
+[dir="rtl"] .card {
+  text-align: right;
+}

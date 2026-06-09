@@ -11,18 +11,22 @@ export default function Register({ onRegister, onNavigate }) {
 		confirmPassword: '',
 	});
 	const [message, setMessage] = useState('');
+	const [loading, setLoading] = useState(false);
 
-	const handleSubmit = () => {
+	const handleSubmit = async () => {
 		if (form.password !== form.confirmPassword) {
 			setMessage('Les mots de passe doivent correspondre.');
 			return;
 		}
-
-		const result = onRegister(form);
-		setMessage(result.message);
-
-		if (result.success) {
-			onNavigate('/account');
+		setLoading(true);
+		try {
+			const result = await onRegister(form);
+			setMessage(result.message);
+			if (result.success) {
+				onNavigate('/account');
+			}
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -43,13 +47,20 @@ export default function Register({ onRegister, onNavigate }) {
 			</div>
 
 			<div className="notice notice--info">
-				Validation prévue côté client et côté serveur. Règles : 8 caractères min., majuscule, minuscule, chiffre, caractère spécial.
+				Règles de mot de passe : 8 caractères min., une majuscule, une minuscule, un chiffre, un caractère spécial.
 			</div>
-			{message ? <div className={`notice ${message.includes('créé') ? 'notice--success' : 'notice--warning'}`}>{message}</div> : null}
+			{message ? (
+				<div
+					className={`notice ${message.includes('créé') || message.includes('Bienvenue') ? 'notice--success' : 'notice--warning'}`}
+					role="alert"
+				>
+					{message}
+				</div>
+			) : null}
 
 			<div className="page-actions">
 				<button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/login')}>J’ai déjà un compte</button>
-				<button className="btn btn--primary auth-action" type="button" onClick={handleSubmit}>S'inscrire</button>
+				<button className="btn btn--primary auth-action" type="button" onClick={handleSubmit} disabled={loading}>{loading ? 'Inscription…' : "S'inscrire"}</button>
 			</div>
 		</section>
 	);

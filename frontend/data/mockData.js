@@ -243,37 +243,15 @@ export const initialProducts = [
 ];
 
 export const initialUser = {
-  firstName: 'Lina',
-  lastName: 'Martin',
-  email: 'lina.martin@cabinet-demo.fr',
-  phone: '+33 6 44 55 66 77',
-  company: 'Cabinet Démo',
-  verified: true,
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  company: '',
+  verified: false,
   role: 'customer',
-  addresses: [
-    {
-      id: 'addr-1',
-      label: 'Cabinet principal',
-      firstName: 'Lina',
-      lastName: 'Martin',
-      address1: '12 rue des Tilleuls',
-      address2: 'Bâtiment A',
-      city: 'Lyon',
-      region: 'Auvergne-Rhône-Alpes',
-      postalCode: '69003',
-      country: 'France',
-      phone: '+33 6 44 55 66 77',
-    },
-  ],
-  paymentMethods: [
-    {
-      id: 'pm-1',
-      label: 'Visa professionnelle',
-      cardholderName: 'Lina Martin',
-      last4: '4242',
-      expiry: '08/28',
-    },
-  ],
+  addresses: [],
+  paymentMethods: [],
 };
 
 export const initialSession = {
@@ -281,31 +259,6 @@ export const initialSession = {
   role: 'guest',
 };
 
-export const initialOrders = [
-  {
-    id: 'CMD-2026-1008',
-    createdAt: '2026-03-18',
-    status: 'En préparation expédition',
-    totalCents: 25990,
-    items: [
-      { productId: 'prod-oxymetre-pouls', quantity: 2 },
-      { productId: 'prod-tensiometre-pro', quantity: 1 },
-    ],
-    billingAddress: initialUser.addresses[0],
-    paymentSummary: 'Visa •••• 4242',
-  },
-  {
-    id: 'CMD-2026-1007',
-    createdAt: '2026-03-07',
-    status: 'Facturée',
-    totalCents: 8999,
-    items: [{ productId: 'prod-tensiometre-pro', quantity: 1 }],
-    billingAddress: initialUser.addresses[0],
-    paymentSummary: 'Visa •••• 4242',
-  },
-];
+export const initialOrders = [];
 
-export const initialCart = [
-  { productId: 'prod-tensiometre-pro', quantity: 1 },
-  { productId: 'prod-spirometre', quantity: 1 },
-];
+export const initialCart = [];

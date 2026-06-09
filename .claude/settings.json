@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check backend/server.js)",
+      "Bash(node -e \"require\\('./backend/server.js'\\)\")",
+      "Bash(node -e \"require\\('bcryptjs'\\); require\\('pg'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"const b=require\\('bcryptjs'\\); Promise.all\\([b.hash\\('Admin123!',12\\),b.hash\\('Client123!',12\\)]\\).then\\(\\([a,c]\\)=>console.log\\(a+'|||'+c\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./server.js'\\)\")",
+      "Bash(curl -s -X POST http://localhost:3001/api/pg/auth/login -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"admin@althea.medical\\\\\",\\\\\"password\\\\\":\\\\\"Admin123!\\\\\"}\")",
+      "Bash(curl -s http://localhost:3001/api/pg/users)",
+      "Bash(node -e \"require\\('concurrently'\\)\")",
+      "Bash(npm install *)",
+      "Bash(curl -s -X POST http://localhost:3001/api/pg/auth/register -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"test.dev@althea.medical\\\\\",\\\\\"password\\\\\":\\\\\"Test1234!\\\\\",\\\\\"first_name\\\\\":\\\\\"Test\\\\\",\\\\\"last_name\\\\\":\\\\\"Dev\\\\\"}\")",
+      "Bash(node -e ' *)",
+      "Bash(node --input-type=module --eval \"import\\('./App.jsx'\\).then\\(\\(\\)=>console.log\\('OK'\\)\\).catch\\(e=>console.error\\(e.message\\)\\)\")"
+    ]
+  }
+}

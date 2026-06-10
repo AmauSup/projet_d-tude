@@ -111,6 +111,19 @@ export default function Header({
           </form>
 
           <div className="site-header__actions">
+            <nav className="site-header__nav" aria-label="Navigation principale">
+              {navItems.map((item) => (
+                <button
+                  key={item.path}
+                  type="button"
+                  className={`site-header__link ${currentPath === item.path ? 'is-active' : ''}`}
+                  onClick={() => go(item.path)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
             <select
               className="select site-header__locale"
               aria-label="Choisir la langue"
@@ -178,20 +191,6 @@ export default function Header({
             </button>
           </div>
         </div>
-
-        {/* Ligne 2 : navigation desktop */}
-        <nav className="site-header__nav" aria-label="Navigation principale">
-          {navItems.map((item) => (
-            <button
-              key={item.path}
-              type="button"
-              className={`site-header__link ${currentPath === item.path ? 'is-active' : ''}`}
-              onClick={() => go(item.path)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
 
         {/* Burger menu (dropdown mobile) */}
         {menuOpen && (

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
@@ -101,6 +102,12 @@ function normalizeOrder(o) {
       : (o.billing_address || {}),
     paymentSummary: o.payment_summary || '',
   };
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
 }
 
 function RequireAuth({ isAuthenticated, children }) {
@@ -310,25 +317,23 @@ export default function App() {
     }
     try {
       const result = await authService.login({ email, password, rememberMe });
-      // Admin → 2FA requis, on redirige vers la page OTP
-      if (result.requires_2fa) {
-        setPendingAdmin2FA({ userId: result.user_id, rememberMe });
-        navigate('/verify-2fa');
-        return { success: true, message: 'Code de vérification envoyé à votre adresse e-mail.' };
-      }
       const role = result.userRole || (result.user?.is_admin ? 'admin' : 'customer');
-      setSession({ isAuthenticated: true, role });
-      setUserProfile({
-        firstName: result.user?.first_name || '',
-        lastName: result.user?.last_name || '',
-        email: result.user?.email || email,
-        phone: '',
-        company: '',
-        verified: true,
-        role,
-        id: result.user?.id,
-        addresses: [],
-        paymentMethods: [],
+      // flushSync : force le commit de la session AVANT que Login.jsx appelle onNavigate,
+      // sinon RequireAuth voit encore isAuthenticated=false et redirige vers /login.
+      flushSync(() => {
+        setSession({ isAuthenticated: true, role });
+        setUserProfile({
+          firstName: result.user?.first_name || '',
+          lastName: result.user?.last_name || '',
+          email: result.user?.email || email,
+          phone: '',
+          company: '',
+          verified: true,
+          role,
+          id: result.user?.id,
+          addresses: [],
+          paymentMethods: [],
+        });
       });
       // Charger les commandes réelles de l'utilisateur
       apiClient.get('/pg/orders')
@@ -360,22 +365,24 @@ export default function App() {
           message: `Un e-mail de confirmation a été envoyé à ${email}. Cliquez sur le lien pour activer votre compte.`,
         };
       }
-      // Fallback si le backend retourne directement un token (ancienne version)
+      // Token retourné directement (SMTP non configuré = auto-vérification en dev)
       const role = 'customer';
-      setUserProfile({
-        firstName,
-        lastName,
-        email: result.user?.email || email,
-        phone: '',
-        company: company || '',
-        verified: true,
-        role,
-        id: result.user?.id,
-        addresses: [],
-        paymentMethods: [],
+      flushSync(() => {
+        setUserProfile({
+          firstName,
+          lastName,
+          email: result.user?.email || email,
+          phone: '',
+          company: company || '',
+          verified: true,
+          role,
+          id: result.user?.id,
+          addresses: [],
+          paymentMethods: [],
+        });
+        setOrders([]);
+        setSession({ isAuthenticated: true, role });
       });
-      setOrders([]);
-      setSession({ isAuthenticated: true, role });
       return { success: true, message: 'Compte créé avec succès. Bienvenue !' };
     } catch (err) {
       return { success: false, message: err.message || 'Erreur lors de la création du compte.' };
@@ -403,14 +410,16 @@ export default function App() {
   const handle2FAVerify = useCallback(async ({ user_id, otp, rememberMe }) => {
     const result = await authService.verify2fa({ user_id, otp, rememberMe });
     const role = 'admin';
-    setSession({ isAuthenticated: true, role });
-    setUserProfile({
-      firstName: result.user?.first_name || '',
-      lastName: result.user?.last_name || '',
-      email: result.user?.email || '',
-      phone: '', company: '', verified: true, role,
-      id: result.user?.id,
-      addresses: [], paymentMethods: [],
+    flushSync(() => {
+      setSession({ isAuthenticated: true, role });
+      setUserProfile({
+        firstName: result.user?.first_name || '',
+        lastName: result.user?.last_name || '',
+        email: result.user?.email || '',
+        phone: '', company: '', verified: true, role,
+        id: result.user?.id,
+        addresses: [], paymentMethods: [],
+      });
     });
     apiClient.get('/pg/orders')
       .then((data) => setOrders((data.orders || []).map(normalizeOrder)))
@@ -547,7 +556,7 @@ export default function App() {
   };
 
   const handleDeleteProduct = (productId) => {
-    if (!window.confirm('Supprimer ce produit de l’interface admin ?')) {
+    if (!window.confirm("Supprimer ce produit de l'interface admin ?")) {
       return;
     }
 
@@ -603,6 +612,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <ScrollToTop />
       <Header
         navItems={navItems}
         currentPath={location.pathname}

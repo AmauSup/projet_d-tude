@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import './Register.css';
@@ -38,6 +38,10 @@ export default function Register({ onRegister, onNavigate }) {
 	const passwordValid = Object.values(passwordRules).every(Boolean);
 	const passwordsMatch = form.password === form.confirmPassword;
 
+	useEffect(() => {
+		if (confirmationPending) window.scrollTo(0, 0);
+	}, [confirmationPending]);
+
 	const touch = (field) => setTouched((prev) => ({ ...prev, [field]: true }));
 
 	function getFormError() {
@@ -72,8 +76,8 @@ export default function Register({ onRegister, onNavigate }) {
 					<h1 className="page__title">Vérifiez votre e-mail</h1>
 					<p className="page__subtitle">Un e-mail de confirmation a été envoyé à <strong>{form.email}</strong>.</p>
 				</header>
-				<output className="notice notice--success">
-					<strong>Compte créé !</strong> Cliquez sur le lien dans l'e-mail pour activer votre compte (valable 24h).
+				<output className="notice notice--success" style={{ display: 'block' }}>
+					<strong>Compte créé !</strong> Cliquez sur le lien dans l&apos;e-mail pour activer votre compte (valable 24h).
 					Vous pouvez naviguer sur le site, mais certaines fonctionnalités nécessitent une connexion après confirmation.
 				</output>
 				<div className="page-actions">
@@ -94,6 +98,12 @@ export default function Register({ onRegister, onNavigate }) {
 				<h1 className="page__title">Créer un compte</h1>
 				<p className="page__subtitle">Créez votre compte professionnel pour suivre commandes, factures et adresses.</p>
 			</header>
+
+			<div className="inline-actions" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
+				<button className="btn btn--primary auth-action" type="button" onClick={() => onNavigate('/login')}>
+					Se connecter
+				</button>
+			</div>
 
 			<form className="form-grid" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} noValidate>
 				<div>
@@ -204,7 +214,6 @@ export default function Register({ onRegister, onNavigate }) {
 			) : null}
 
 			<div className="page-actions">
-				<button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/login')}>J'ai déjà un compte</button>
 				<button className="btn btn--primary auth-action" type="button" onClick={handleSubmit} disabled={loading}>{loading ? 'Inscription…' : "S'inscrire"}</button>
 			</div>
 		</section>

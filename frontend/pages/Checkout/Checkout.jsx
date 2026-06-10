@@ -100,7 +100,7 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 		<section className="page checkout-page">
 			<header className="page__header">
 				<h1 className="page__title">Passage en caisse</h1>
-				<p className="page__subtitle">Tunnel prêt pour un paiement sécurisé, une création de commande backend et l’envoi d’un e-mail de confirmation.</p>
+				<p className="page__subtitle">Tunnel prêt pour un paiement sécurisé, une création de commande backend et l'envoi d'un e-mail de confirmation.</p>
 			</header>
 
 			<div className="checkout-steps">
@@ -111,7 +111,7 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 			</div>
 
 			{cartItems.length === 0 ? <div className="notice notice--warning">Votre panier est vide. Ajoutez des produits avant de passer au checkout.</div> : null}
-			{summary.unavailableCount > 0 ? <div className="notice notice--warning">Des produits sont indisponibles dans votre panier. Le checkout reste bloqué tant qu’ils ne sont pas retirés.</div> : null}
+			{summary.unavailableCount > 0 ? <div className="notice notice--warning">Des produits sont indisponibles dans votre panier. Le checkout reste bloqué tant qu'ils ne sont pas retirés.</div> : null}
 			{feedback ? <div className={`notice ${feedback.includes('validée') ? 'notice--success' : 'notice--warning'}`}>{feedback}</div> : null}
 
 			{step === 1 ? (
@@ -121,12 +121,12 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 						<div className="notice notice--success">Connecté en tant que {user.email}. Vous pouvez poursuivre le checkout.</div>
 					) : (
 						<>
-							<p>Vous pouvez vous connecter, créer un compte ou continuer en tant qu’invité.</p>
+							<p>Vous pouvez vous connecter, créer un compte ou continuer en tant qu'invité.</p>
 							<div className="inline-actions">
 								<button className="btn btn--secondary" type="button" onClick={() => routerNavigate('/login', { state: { from: '/checkout' } })}>Se connecter</button>
 								<button className="btn btn--secondary" type="button" onClick={() => routerNavigate('/register', { state: { from: '/checkout' } })}>Créer un compte</button>
 							</div>
-							<label><input type="checkbox" checked={guestMode} onChange={(event) => setGuestMode(event.target.checked)} /> Continuer en tant qu’invité</label>
+							<label><input type="checkbox" checked={guestMode} onChange={(event) => setGuestMode(event.target.checked)} /> Continuer en tant qu'invité</label>
 						</>
 					)}
 				</div>
@@ -137,7 +137,7 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 					<div className="inline-actions">
 						{user.addresses?.length ? (
 							<button className="btn btn--secondary" type="button" onClick={() => setAddress(buildInitialAddress(user))}>
-								Utiliser l’adresse enregistrée
+								Utiliser l'adresse enregistrée
 							</button>
 						) : null}
 					</div>

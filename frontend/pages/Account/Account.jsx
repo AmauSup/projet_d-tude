@@ -1,32 +1,44 @@
-import React from ‘react’;
-import ‘./Account.css’;
+import React from 'react';
+import PropTypes from 'prop-types';
+import './Account.css';
 
 const ACCOUNT_NAV = [
   {
-    path: ‘/account/settings’,
-    icon: ‘⚙️’,
-    title: ‘Paramètres’,
-    description: ‘Modifier nom, e-mail et mot de passe’,
+    path: '/account/settings',
+    icon: '⚙️',
+    title: 'Paramètres',
+    description: 'Modifier nom, e-mail et mot de passe',
   },
   {
-    path: ‘/account/addresses’,
-    icon: ‘📍’,
-    title: ‘Mes adresses’,
-    description: ‘Carnet d’adresses de livraison et facturation’,
+    path: '/account/addresses',
+    icon: '📍',
+    title: 'Mes adresses',
+    description: "Carnet d'adresses de livraison et facturation",
   },
   {
-    path: ‘/account/payments’,
-    icon: ‘💳’,
-    title: ‘Mes paiements’,
-    description: ‘Cartes enregistrées (4 derniers chiffres)’,
+    path: '/account/payments',
+    icon: '💳',
+    title: 'Mes paiements',
+    description: 'Cartes enregistrées (4 derniers chiffres)',
   },
   {
-    path: ‘/orders’,
-    icon: ‘📦’,
-    title: ‘Mes commandes’,
-    description: ‘Historique, statuts et factures PDF’,
+    path: '/orders',
+    icon: '📦',
+    title: 'Mes commandes',
+    description: 'Historique, statuts et factures PDF',
   },
 ];
+
+Account.propTypes = {
+  user: PropTypes.shape({
+    firstName: PropTypes.string,
+    lastName: PropTypes.string,
+    email: PropTypes.string,
+  }).isRequired,
+  session: PropTypes.shape({ isAuthenticated: PropTypes.bool }).isRequired,
+  orders: PropTypes.array,
+  onNavigate: PropTypes.func.isRequired,
+};
 
 export default function Account({ user, session, orders = [], onNavigate }) {
 	if (!session.isAuthenticated) {
@@ -37,8 +49,8 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 					<p className="page__subtitle">Connectez-vous pour accéder à votre profil, vos adresses et vos commandes.</p>
 				</header>
 				<div className="inline-actions">
-					<button className="btn btn--primary" type="button" onClick={() => onNavigate(‘/login’)}>Se connecter</button>
-					<button className="btn btn--secondary" type="button" onClick={() => onNavigate(‘/register’)}>Créer un compte</button>
+					<button className="btn btn--primary" type="button" onClick={() => onNavigate('/login')}>Se connecter</button>
+					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/register')}>Créer un compte</button>
 				</div>
 			</section>
 		);
@@ -73,7 +85,7 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 					<h3>Dernières commandes</h3>
 					<div className="stack">
 						{orders.slice(0, 3).map((order) => (
-							<div key={order.id} className="panel inline-actions" style={{ justifyContent: ‘space-between’ }}>
+							<div key={order.id} className="panel inline-actions" style={{ justifyContent: 'space-between' }}>
 								<div>
 									<strong>{order.id}</strong>
 									<p className="helper-text">{order.createdAt} — {order.status}</p>
@@ -82,9 +94,9 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 							</div>
 						))}
 					</div>
-					<div className="page-actions" style={{ justifyContent: ‘flex-start’ }}>
-						<button className="btn btn--secondary" type="button" onClick={() => onNavigate(‘/orders’)}>
-							Voir tout l’historique
+					<div className="page-actions" style={{ justifyContent: 'flex-start' }}>
+						<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/orders')}>
+							Voir tout l'historique
 						</button>
 					</div>
 				</article>

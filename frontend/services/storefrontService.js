@@ -1,5 +1,12 @@
 import { apiClient } from './apiClient.js';
 
+function toImageUrl(img) {
+  if (!img) return '';
+  if (typeof img === 'string') return img;
+  if (typeof img === 'object') return img.url || img.src || img.href || img.path || '';
+  return '';
+}
+
 function normalizeProduct(p) {
   const description = p.description || p.description_fr || '';
   const characteristics = p.characteristics || p.characteristics_fr || '';
@@ -8,9 +15,10 @@ function normalizeProduct(p) {
     : [];
   let images;
   if (p.images && Array.isArray(p.images)) {
-    images = p.images;
+    images = p.images.map(toImageUrl).filter(Boolean);
   } else if (p.image) {
-    images = [p.image];
+    const url = toImageUrl(p.image);
+    images = url ? [url] : [];
   } else {
     images = [];
   }

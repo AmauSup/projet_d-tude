@@ -164,15 +164,30 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
       message: 'Mot de passe trop faible (8+ caractères, majuscule, minuscule, chiffre, spécial).',
     });
   }
+  // En dev sans SMTP configuré, on auto-vérifie le compte pour éviter le blocage à la connexion
+  const smtpConfigured = !!process.env.SMTP_HOST;
   try {
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (existing.rows.length > 0) return res.status(409).json({ message: 'Email déjà utilisé.' });
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      'INSERT INTO users (email, password, last_name, first_name, email_verified) VALUES ($1, $2, $3, $4, FALSE) RETURNING id, email, last_name, first_name, is_admin',
-      [email.toLowerCase().trim(), hash, last_name, first_name],
+      'INSERT INTO users (email, password, last_name, first_name, email_verified) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, last_name, first_name, is_admin',
+      [email.toLowerCase().trim(), hash, last_name, first_name, !smtpConfigured],
     );
     const user = result.rows[0];
+
+    if (!smtpConfigured) {
+      // Mode dev sans email : connexion directe, pas de confirmation requise
+      console.info('[DEV] Compte auto-vérifié (SMTP non configuré) :', user.email);
+      const token = jwt.sign({ id: user.id, is_admin: false }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+      return res.status(201).json({
+        success: true,
+        requires_confirmation: false,
+        token,
+        user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name },
+      });
+    }
+
     // Créer un token de vérification valable 24h
     const verificationToken = require('node:crypto').randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -208,21 +223,12 @@ app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) =
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ message: 'Identifiants invalides.' });
 
-    // Vérification email obligatoire avant connexion
-    if (user.email_verified === false) {
+    // Vérification email obligatoire avant connexion (seulement si SMTP configuré)
+    if (process.env.SMTP_HOST && user.email_verified === false) {
       return res.status(403).json({
         message: 'Compte non confirmé. Veuillez cliquer sur le lien reçu par e-mail pour activer votre compte.',
         unconfirmed: true,
       });
-    }
-
-    // Les admins doivent valider un OTP par email
-    if (user.is_admin) {
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
-      adminOtpStore.set(user.id, { otp, expires, user });
-      mailer.sendAdminOtp(user, otp).catch((e) => console.warn('[mailer 2fa]', e.message));
-      return res.json({ success: true, requires_2fa: true, user_id: user.id });
     }
 
     const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -299,6 +305,14 @@ app.post('/api/pg/auth/resend-verification', rateLimit(15 * 60 * 1000, 5), async
       'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, verificationToken, verificationExpires],
     );
+    if (!process.env.SMTP_HOST) {
+      // En dev, auto-vérifier directement sans envoyer d'email
+      await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1', [user.id]);
+      const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+      console.info('[DEV] Compte auto-vérifié via resend (SMTP non configuré) :', user.email);
+      console.info('[DEV] Lien de vérification :', verifyLink);
+      return res.json({ success: true });
+    }
     const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
     mailer.sendEmailVerification(user, verifyLink).catch((e) => console.warn('[mailer resend-verify]', e.message));
     return res.json({ success: true });

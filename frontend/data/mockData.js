@@ -22,7 +22,7 @@ export const initialHomeContent = {
       id: 'support',
       badge: 'Service',
       title: 'Maintenance et accompagnement',
-      text: 'Préparez les offres SAV, accessoires et consommables pour un tunnel d’achat fluide.',
+      text: "Préparez les offres SAV, accessoires et consommables pour un tunnel d'achat fluide.",
       ctaLabel: 'Contacter le support',
       categorySlug: 'monitoring',
     },
@@ -63,7 +63,7 @@ export const initialCategories = [
     name: 'Imagerie',
     heroLabel: 'Imagerie portable',
     description: 'Échographes et accessoires de visualisation pour une pratique mobile et polyvalente.',
-    imageHint: 'Appareil d’imagerie prêt à l’usage.',
+    imageHint: "Appareil d'imagerie prêt à l'usage.",
     displayOrder: 4,
   },
   {
@@ -80,7 +80,7 @@ export const initialCategories = [
     slug: 'mobilier',
     name: 'Mobilier médical',
     heroLabel: 'Mobilier technique',
-    description: 'Fauteuils d’examen, chariots et mobilier conçu pour optimiser les espaces de soin.',
+    description: "Fauteuils d'examen, chariots et mobilier conçu pour optimiser les espaces de soin.",
     imageHint: 'Mobilier médical modulable.',
     displayOrder: 6,
   },
@@ -128,7 +128,7 @@ export const initialProducts = [
     name: 'Stéthoscope cardiologie Premium',
     shortDescription: 'Acoustique haute précision pour examens avancés.',
     description:
-      'Optimisé pour l’auscultation de précision, avec pavillon double et membrane haute sensibilité.',
+      "Optimisé pour l'auscultation de précision, avec pavillon double et membrane haute sensibilité.",
     technicalFeatures: ['Pavillon double', 'Tubulure anti-bruit', 'Garantie 5 ans'],
     tags: ['stethoscope', 'cardiologie'],
     priceCents: 11900,
@@ -179,7 +179,7 @@ export const initialProducts = [
     name: 'Moniteur multiparamétrique M7',
     shortDescription: 'ECG, NIBP, SpO2 et alarmes paramétrables.',
     description:
-      'Pensé pour les services d’urgence et les cabinets spécialisés, avec profils patients et historique d’alarmes.',
+      "Pensé pour les services d'urgence et les cabinets spécialisés, avec profils patients et historique d'alarmes.",
     technicalFeatures: ['ECG 3/5 dérivations', 'NIBP', 'SpO2', 'Connecteur HL7 futur backend'],
     tags: ['moniteur', 'ecg', 'surveillance'],
     priceCents: 149000,
@@ -196,7 +196,7 @@ export const initialProducts = [
     name: 'Spiromètre clinique connecté',
     shortDescription: 'Exploration respiratoire avec export des courbes.',
     description:
-      'Solution adaptée aux bilans respiratoires et à l’intégration future dans un dossier patient.',
+      "Solution adaptée aux bilans respiratoires et à l'intégration future dans un dossier patient.",
     technicalFeatures: ['Courbes débit-volume', 'Export CSV', 'Capteurs remplaçables'],
     tags: ['spirometre', 'respiratoire'],
     priceCents: 74900,
@@ -210,7 +210,7 @@ export const initialProducts = [
     id: 'prod-fauteuil-examen',
     slug: 'fauteuil-examen-electrique',
     categoryId: 'mobilier',
-    name: 'Fauteuil d’examen électrique',
+    name: "Fauteuil d'examen électrique",
     shortDescription: 'Réglage hauteur et dossier pour soins polyvalents.',
     description:
       'Mobilier médical ergonomique avec commandes électriques et sellerie facile à désinfecter.',

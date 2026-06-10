@@ -8,7 +8,7 @@ export default function Confirmation({ order, products = [], onNavigate }) {
       <section className="page confirmation-page">
         <header className="page__header">
           <h1 className="page__title">Confirmation de commande</h1>
-          <p className="page__subtitle">Aucune commande n’a encore été validée.</p>
+          <p className="page__subtitle">Aucune commande n'a encore été validée.</p>
         </header>
 
         <button className="btn btn--primary" type="button" onClick={() => onNavigate('/cart')}>
@@ -76,7 +76,7 @@ export default function Confirmation({ order, products = [], onNavigate }) {
           Voir mes commandes
         </button>
         <button className="btn btn--primary" type="button" onClick={() => onNavigate('/')}>
-          Retour à l’accueil
+          Retour à l'accueil
         </button>
       </div>
     </section>

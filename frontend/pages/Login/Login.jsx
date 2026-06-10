@@ -97,12 +97,13 @@ export default function Login({ onLogin, onNavigate }) {
 				) : null}
 
 				<div className="page-actions">
-					<button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/register')}>
-						Créer un compte
-					</button>
 					<button className="btn btn--primary auth-action" type="submit" disabled={loading}>
 						{loading ? 'Connexion…' : 'Se connecter'}
 					</button>
+					<button className="btn btn--secondary auth-action" type="button" onClick={() => onNavigate('/register')}>
+						Créer un compte
+					</button>
+					
 				</div>
 			</form>
 		</section>

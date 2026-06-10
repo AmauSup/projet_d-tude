@@ -41,7 +41,7 @@ export default function Breadcrumbs() {
   let currentPath = '';
 
   return (
-    <nav className="breadcrumbs" aria-label="Fil d’ariane">
+    <nav className="breadcrumbs" aria-label="Fil d'ariane">
       <ol>
         <li>
           <Link to="/">Accueil</Link>

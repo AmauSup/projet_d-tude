@@ -273,7 +273,10 @@ export default function App() {
     });
   };
 
-  const handleCategoryNavigation = (categorySlug) => navigate(`/categories/${categorySlug}`);
+  const handleCategoryNavigation = (categorySlug) => {
+    if (!categorySlug) navigate('/catalog');
+    else navigate(`/categories/${categorySlug}`);
+  };
 
   const handleProductNavigation = (productSlug) => navigate(`/products/${productSlug}`);
 
@@ -650,8 +653,8 @@ export default function App() {
             element={
               <Category
                 categories={sortedCategories}
-                activeCategory={activeCategory}
-                products={categoryProducts}
+                activeCategory={null}
+                products={sortProductsForCategory(products)}
                 onSelectCategory={handleCategoryNavigation}
                 onOpenProduct={handleProductNavigation}
               />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
 
@@ -29,6 +29,7 @@ export default function AccountPayments({ onNavigate }) {
   const [formMsg, setFormMsg] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [feedback, setFeedback] = useState('');
+  const formRef = useRef(null);
 
   const load = () => {
     setLoading(true);
@@ -131,7 +132,7 @@ export default function AccountPayments({ onNavigate }) {
 
       {/* Formulaire ajout */}
       {showForm && (
-        <article className="card stack">
+        <article className="card stack" ref={formRef}>
           <h2>Ajouter une carte</h2>
           <div className="notice notice--info">
             Vos données de carte ne sont pas stockées — seuls les 4 derniers chiffres et la date d'expiration sont conservés.
@@ -170,9 +171,14 @@ export default function AccountPayments({ onNavigate }) {
                 className={`input${formErrors.expiry ? ' input--error' : ''}`}
                 placeholder="MM/AA"
                 value={form.expiry}
-                onChange={(e) => set('expiry', e.target.value)}
+                inputMode="numeric"
                 maxLength={5}
                 autoComplete="cc-exp"
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+                  set('expiry', formatted);
+                }}
               />
               {formErrors.expiry && <p className="helper-text helper-text--error">{formErrors.expiry}</p>}
             </div>
@@ -219,7 +225,7 @@ export default function AccountPayments({ onNavigate }) {
 
       {!showForm && (
         <div className="page-actions" style={{ justifyContent: 'flex-start', marginBottom: 16 }}>
-          <button className="btn btn--primary" type="button" onClick={() => { setShowForm(true); setFeedback(''); }}>
+          <button className="btn btn--primary" type="button" onClick={() => { setShowForm(true); setFeedback(''); setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}>
             + Ajouter une carte
           </button>
         </div>

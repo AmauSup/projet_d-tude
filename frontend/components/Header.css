@@ -88,8 +88,11 @@
 
 .site-header__locale {
   width: auto;
-  min-width: 58px;
-  height: 40px;
+  min-width: 46px;
+  max-width: 56px;
+  height: 34px;
+  padding: 0 4px;
+  font-size: 0.82rem;
 }
 
 .site-header__utility {

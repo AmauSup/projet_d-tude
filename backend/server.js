@@ -86,6 +86,23 @@ pool.query(`
   ALTER TABLE contact_message ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'contact';
 `).catch((e) => console.warn('[DB migration email_verified]', e.message));
 
+// Migration : table des moyens de paiement enregistrés par les utilisateurs
+pool.query(`
+  CREATE TABLE IF NOT EXISTS payment_method (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS user_id         INT          REFERENCES users(id) ON DELETE CASCADE;
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS provider        VARCHAR(50)  NOT NULL DEFAULT 'card';
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS last4           CHAR(4)      NOT NULL DEFAULT '0000';
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS expiry_month    SMALLINT     NOT NULL DEFAULT 1;
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS expiry_year     SMALLINT     NOT NULL DEFAULT 2030;
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS cardholder_name VARCHAR(255) NOT NULL DEFAULT '';
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS is_default      BOOLEAN      NOT NULL DEFAULT FALSE;
+  ALTER TABLE payment_method ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW();
+  CREATE INDEX IF NOT EXISTS idx_payment_method_user ON payment_method(user_id);
+`).catch((e) => console.warn('[DB migration payment_method]', e.message));
+
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
@@ -387,7 +404,7 @@ app.get('/api/pg/storefront', async (_req, res) => {
                c.slug AS category_slug
         FROM product p
         LEFT JOIN product_translation pt ON pt.product_id = p.id
-        LEFT JOIN language l ON pt.language_id = l.id AND l.code = 'fr'
+          AND pt.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
         LEFT JOIN category c ON c.id = p.category_id
         WHERE p.deleted_at IS NULL
         ORDER BY p.created_at DESC
@@ -474,10 +491,27 @@ app.put('/api/pg/admin/products/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(
-      'UPDATE product SET price=$1, stock=$2, image=$3, category_id=$4, priority=$5, featured=$6, slug=$7, updated_at=NOW() WHERE id=$8',
-      [price, stock, image, category_id, priority || 0, featured || 0, slug || null, id],
-    );
+
+    const setClauses = [];
+    const values = [];
+    const add = (col, val) => { setClauses.push(`${col}=$${values.push(val)}`); };
+
+    if (price !== undefined)       add('price', price);
+    if (stock !== undefined)       add('stock', stock);
+    if (image !== undefined)       add('image', image);
+    if (category_id !== undefined) add('category_id', category_id);
+    if (priority !== undefined)    add('priority', priority || 0);
+    if (featured !== undefined)    add('featured', featured || 0);
+    if (slug !== undefined)        add('slug', slug || null);
+
+    if (setClauses.length > 0) {
+      values.push(id);
+      await client.query(
+        `UPDATE product SET ${setClauses.join(', ')}, updated_at=NOW() WHERE id=$${values.length}`,
+        values,
+      );
+    }
+
     logAdmin(req.user.id, 'update_product', `product:${id}`);
     if (name !== undefined) {
       const langRes = await client.query("SELECT id FROM language WHERE code = 'fr' LIMIT 1");
@@ -744,8 +778,8 @@ app.post('/api/pg/orders', authenticateToken, async (req, res) => {
 
     for (const item of validatedItems) {
       await client.query(
-        'INSERT INTO order_item (order_id, product_id, quantity, unit_price, line_total) VALUES ($1, $2, $3, $4, $5)',
-        [order.id, item.productId, item.quantity, item.price, item.lineTotal],
+        'INSERT INTO order_item (order_id, product_id, quantity, unit_price, line_total, subtotal) VALUES ($1, $2, $3, $4, $5, $6)',
+        [order.id, item.productId, item.quantity, item.price, item.lineTotal, item.lineTotal],
       );
       await client.query('UPDATE product SET stock = stock - $1, updated_at = NOW() WHERE id = $2', [
         item.quantity,
@@ -781,7 +815,7 @@ app.post('/api/pg/orders', authenticateToken, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[create order]', err.message);
-    return res.status(500).json({ message: 'Erreur serveur.' });
+    return res.status(500).json({ message: err.message || 'Erreur serveur.' });
   } finally {
     client.release();
   }

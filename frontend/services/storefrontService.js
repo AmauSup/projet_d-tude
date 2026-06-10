@@ -2,7 +2,12 @@ import { apiClient } from './apiClient.js';
 
 function toImageUrl(img) {
   if (!img) return '';
-  if (typeof img === 'string') return img;
+  if (typeof img === 'string') {
+    if (img.trimStart().startsWith('{')) {
+      try { return toImageUrl(JSON.parse(img)); } catch { /* fall through */ }
+    }
+    return img;
+  }
   if (typeof img === 'object') return img.url || img.src || img.href || img.path || '';
   return '';
 }
@@ -38,7 +43,7 @@ function normalizeProduct(p) {
     availableStock: Number(p.stock) || 0,
     categoryId: p.category_id,
     categorySlug: p.category_slug || '',
-    image: p.image || '',
+    image: toImageUrl(p.image),
     images,
     priorityRank: Number(p.priority) || 0,
     featuredRank: Number(p.featured) || 0,
@@ -66,7 +71,7 @@ function normalizeCategory(c) {
     slug: c.slug || `category-${c.id}`,
     name: c.name || '',
     description: c.description || '',
-    imageUrl: c.image_url || '',
+    imageUrl: toImageUrl(c.image_url),
     displayOrder: c.order_index ?? c.displayOrder ?? 0,
   };
 }

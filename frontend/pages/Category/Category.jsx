@@ -32,7 +32,7 @@ export default function Category({
   return (
     <section className="page category-page">
       <header className="page__header">
-        <h1 className="page__title">Catalogue — {activeCategory?.name}</h1>
+        <h1 className="page__title">Catalogue{activeCategory ? ` — ${activeCategory.name}` : ' — Tous les produits'}</h1>
         <p className="page__subtitle">
           Tri métier : produits prioritaires puis disponibles, les ruptures de stock restant visibles en bas.
         </p>
@@ -61,9 +61,10 @@ export default function Category({
 
           <select
             className="select"
-            value={activeCategory?.slug}
+            value={activeCategory?.slug ?? ''}
             onChange={(event) => onSelectCategory(event.target.value)}
           >
+            <option value="">Tous les produits</option>
             {categories.map((category) => (
               <option key={category.id} value={category.slug}>
                 {category.name}

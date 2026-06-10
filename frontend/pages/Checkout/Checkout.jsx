@@ -183,9 +183,34 @@ export default function Checkout({ cartItems = [], summary, user, session, onNav
 						</div>
 						<div className="form-grid">
 							<input className="input" placeholder="Nom sur la carte" value={payment.cardholderName} onChange={(event) => setPayment({ ...payment, cardholderName: event.target.value })} />
-							<input className="input" placeholder="Numéro de carte (16 chiffres)" value={payment.cardNumber} onChange={(event) => setPayment({ ...payment, cardNumber: event.target.value })} />
-							<input className="input" placeholder="Date d'expiration (MM/AA)" value={payment.expiry} onChange={(event) => setPayment({ ...payment, expiry: event.target.value })} />
-							<input className="input" placeholder="CVV" value={payment.cvv} onChange={(event) => setPayment({ ...payment, cvv: event.target.value })} />
+							<input
+								className="input"
+								placeholder="Numéro de carte (16 chiffres)"
+								value={payment.cardNumber}
+								inputMode="numeric"
+								maxLength={16}
+								onChange={(event) => setPayment({ ...payment, cardNumber: event.target.value.replace(/\D/g, '').slice(0, 16) })}
+							/>
+							<input
+								className="input"
+								placeholder="MM/AA"
+								value={payment.expiry}
+								inputMode="numeric"
+								maxLength={5}
+								onChange={(event) => {
+									const digits = event.target.value.replace(/\D/g, '').slice(0, 4);
+									const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+									setPayment({ ...payment, expiry: formatted });
+								}}
+							/>
+							<input
+								className="input"
+								placeholder="CVV"
+								value={payment.cvv}
+								inputMode="numeric"
+								maxLength={3}
+								onChange={(event) => setPayment({ ...payment, cvv: event.target.value.replace(/\D/g, '').slice(0, 3) })}
+							/>
 						</div>
 					</div>
 

@@ -115,6 +115,31 @@ pool.query(`
   END $$;
 `).catch((e) => console.warn('[DB migration payment_method.name]', e.message));
 
+// Migration : tables de traductions UI et catégories
+pool.query(`
+  CREATE TABLE IF NOT EXISTS app_translation (
+    id          SERIAL PRIMARY KEY,
+    language_id INT          NOT NULL REFERENCES language(id) ON DELETE CASCADE,
+    namespace   VARCHAR(50)  NOT NULL,
+    key         VARCHAR(120) NOT NULL,
+    value       TEXT         NOT NULL,
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE (language_id, namespace, key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_app_tr_lang ON app_translation(language_id);
+
+  CREATE TABLE IF NOT EXISTS category_translation (
+    id          SERIAL PRIMARY KEY,
+    category_id INT NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+    language_id INT NOT NULL REFERENCES language(id) ON DELETE CASCADE,
+    name        VARCHAR(100) NOT NULL DEFAULT '',
+    description TEXT,
+    UNIQUE (category_id, language_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_cat_tr_cat  ON category_translation(category_id);
+  CREATE INDEX IF NOT EXISTS idx_cat_tr_lang ON category_translation(language_id);
+`).catch((e) => console.warn('[DB migration translations]', e.message));
+
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
@@ -378,6 +403,29 @@ app.put('/api/pg/auth/profile', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[profile update]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// --- TRADUCTIONS UI ---
+app.get('/api/pg/translations/:locale', async (req, res) => {
+  try {
+    const { locale } = req.params;
+    const { rows } = await pool.query(
+      `SELECT at.namespace, at.key, at.value
+       FROM app_translation at
+       JOIN language l ON l.id = at.language_id
+       WHERE l.code = $1`,
+      [locale],
+    );
+    const result = {};
+    for (const { namespace, key, value } of rows) {
+      if (!result[namespace]) result[namespace] = {};
+      result[namespace][key] = value;
+    }
+    return res.json({ success: true, translations: result });
+  } catch (err) {
+    console.error('[translations]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

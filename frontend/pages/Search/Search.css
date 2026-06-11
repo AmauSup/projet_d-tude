@@ -80,3 +80,20 @@
     position: static;
   }
 }
+
+[data-theme="dark"] .search-summary {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .search-summary h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .search-summary p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .search-filters label {
+  color: #94a3b8;
+}

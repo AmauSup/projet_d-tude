@@ -17,12 +17,12 @@ export default function Footer({ onNavigate }) {
 					<strong>Althea Systems</strong> — {t('footer.copyright')}
 				</div>
 				<div className="site-footer__links">
-					<button type="button" onClick={() => onNavigate('/contact')}>Contact</button>
-					<button type="button" onClick={() => onNavigate('/terms')}>CGU</button>
-					<button type="button" onClick={() => onNavigate('/legal')}>Mentions légales</button>
-					<button type="button" onClick={() => onNavigate('/about')}>À propos</button>
-					<button type="button" onClick={() => onNavigate('/account')}>Mon compte</button>
-					<button type="button" onClick={() => onNavigate('/admin/dashboard')}>Back-office</button>
+					<button type="button" onClick={() => onNavigate('/contact')}>{t('nav.contact')}</button>
+					<button type="button" onClick={() => onNavigate('/terms')}>{t('nav.terms')}</button>
+					<button type="button" onClick={() => onNavigate('/legal')}>{t('nav.legal')}</button>
+					<button type="button" onClick={() => onNavigate('/about')}>{t('nav.about')}</button>
+					<button type="button" onClick={() => onNavigate('/account')}>{t('nav.account')}</button>
+					<button type="button" onClick={() => onNavigate('/admin/dashboard')}>{t('nav.admin')}</button>
 				</div>
 				<div className="site-footer__links" aria-label="Réseaux sociaux">
 					<a href="https://linkedin.com/company/althea-systems" target="_blank" rel="noopener noreferrer">LinkedIn</a>

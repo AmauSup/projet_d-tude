@@ -129,6 +129,27 @@
   }
 }
 
+[data-theme="dark"] .category-filters {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .category-filters h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .category-filters label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .category-hero__content p {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .category-card strong {
+  color: #f1f5f9;
+}
+
 /* Mobile : liste verticale (image à gauche, contenu à droite) */
 @media (max-width: 768px) {
   .category-page .card-grid {

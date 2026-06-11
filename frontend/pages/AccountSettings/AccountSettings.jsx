@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 AccountSettings.propTypes = {
   user: PropTypes.shape({
@@ -13,15 +14,18 @@ AccountSettings.propTypes = {
 };
 
 export default function AccountSettings({ user = {}, onSave, onNavigate }) {
+  const { t } = useI18n();
   const [profile, setProfile] = useState({
     firstName: user.firstName || '',
     lastName: user.lastName || '',
   });
   const [profileMsg, setProfileMsg] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
   const [emailForm, setEmailForm] = useState({ newEmail: '', confirmPassword: '' });
@@ -32,15 +36,18 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
   const handleSaveProfile = async () => {
     setProfileLoading(true);
     setProfileMsg('');
+    setProfileSuccess(false);
     try {
       await apiClient.put('/pg/auth/profile', {
         first_name: profile.firstName,
         last_name: profile.lastName,
       });
       onSave({ firstName: profile.firstName, lastName: profile.lastName });
-      setProfileMsg('Profil mis à jour.');
+      setProfileMsg(t('settings.saved'));
+      setProfileSuccess(true);
     } catch (err) {
-      setProfileMsg(err.message || 'Erreur lors de la sauvegarde.');
+      setProfileMsg(err.message || t('settings.saved'));
+      setProfileSuccess(false);
     } finally {
       setProfileLoading(false);
     }
@@ -48,11 +55,11 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
 
   const handleChangeEmail = async () => {
     if (!emailForm.newEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.newEmail)) {
-      setEmailMsg('Adresse e-mail invalide.');
+      setEmailMsg(t('settings.errorInvalidEmail'));
       return;
     }
     if (!emailForm.confirmPassword) {
-      setEmailMsg('Veuillez confirmer votre mot de passe actuel.');
+      setEmailMsg(t('settings.errorNeedPassword'));
       return;
     }
     setEmailLoading(true);
@@ -66,10 +73,10 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
       });
       onSave({ email: emailForm.newEmail.trim().toLowerCase() });
       setEmailSuccess(true);
-      setEmailMsg(`E-mail mis à jour : ${emailForm.newEmail.trim().toLowerCase()}`);
+      setEmailMsg(`${t('settings.changeEmailBtn')} : ${emailForm.newEmail.trim().toLowerCase()}`);
       setEmailForm({ newEmail: '', confirmPassword: '' });
     } catch (err) {
-      setEmailMsg(err.message || 'Erreur lors du changement d\'e-mail.');
+      setEmailMsg(err.message || t('settings.errorInvalidEmail'));
     } finally {
       setEmailLoading(false);
     }
@@ -77,28 +84,31 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
 
   const handleChangePassword = async () => {
     if (!passwords.current) {
-      setPwMsg('Veuillez saisir votre mot de passe actuel.');
+      setPwMsg(t('settings.errorNeedCurrent'));
       return;
     }
     if (passwords.next !== passwords.confirm) {
-      setPwMsg('Les nouveaux mots de passe ne correspondent pas.');
+      setPwMsg(t('settings.errorMismatch'));
       return;
     }
     if (passwords.next.length < 8) {
-      setPwMsg('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      setPwMsg(t('settings.errorTooShort'));
       return;
     }
     setPwLoading(true);
     setPwMsg('');
+    setPwSuccess(false);
     try {
       await apiClient.put('/pg/auth/password', {
         currentPassword: passwords.current,
         newPassword: passwords.next,
       });
       setPasswords({ current: '', next: '', confirm: '' });
-      setPwMsg('Mot de passe modifié avec succès.');
+      setPwMsg(t('settings.pwChanged'));
+      setPwSuccess(true);
     } catch (err) {
-      setPwMsg(err.message || 'Erreur lors du changement de mot de passe.');
+      setPwMsg(err.message || t('settings.errorMismatch'));
+      setPwSuccess(false);
     } finally {
       setPwLoading(false);
     }
@@ -107,17 +117,16 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
   return (
     <section className="page">
       <header className="page__header">
-        <h1 className="page__title">Paramètres du compte</h1>
-        <p className="page__subtitle">Modifiez vos informations personnelles et vos identifiants.</p>
+        <h1 className="page__title">{t('settings.title')}</h1>
+        <p className="page__subtitle">{t('settings.subtitle')}</p>
       </header>
 
       <div className="stack">
-        {/* Informations personnelles */}
         <article className="card stack">
-          <h2>Informations personnelles</h2>
+          <h2>{t('settings.personalInfo')}</h2>
           <div className="form-grid">
             <div>
-              <label className="form-label" htmlFor="settings-firstname">Prénom</label>
+              <label className="form-label" htmlFor="settings-firstname">{t('settings.firstName')}</label>
               <input
                 id="settings-firstname"
                 className="input"
@@ -126,7 +135,7 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
               />
             </div>
             <div>
-              <label className="form-label" htmlFor="settings-lastname">Nom</label>
+              <label className="form-label" htmlFor="settings-lastname">{t('settings.lastName')}</label>
               <input
                 id="settings-lastname"
                 className="input"
@@ -136,26 +145,25 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
             </div>
           </div>
           {profileMsg && (
-            <div className={`notice ${profileMsg.includes('mis à jour') ? 'notice--success' : 'notice--warning'}`} role="alert">
+            <div className={`notice ${profileSuccess ? 'notice--success' : 'notice--warning'}`} role="alert">
               {profileMsg}
             </div>
           )}
           <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
             <button className="btn btn--primary" type="button" onClick={handleSaveProfile} disabled={profileLoading}>
-              {profileLoading ? 'Sauvegarde…' : 'Sauvegarder'}
+              {profileLoading ? t('settings.saving') : t('settings.save')}
             </button>
           </div>
         </article>
 
-        {/* Changement d'adresse e-mail */}
         <article className="card stack">
-          <h2>Changer l'adresse e-mail</h2>
+          <h2>{t('settings.changeEmail')}</h2>
           <p className="helper-text">
-            E-mail actuel : <strong>{user.email || '—'}</strong>
+            {t('settings.currentEmail')} <strong>{user.email || '—'}</strong>
           </p>
           <div className="form-grid">
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="settings-new-email">Nouvel e-mail</label>
+              <label className="form-label" htmlFor="settings-new-email">{t('settings.newEmail')}</label>
               <input
                 id="settings-new-email"
                 className="input"
@@ -167,12 +175,12 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
               />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="settings-email-pw">Mot de passe actuel (confirmation)</label>
+              <label className="form-label" htmlFor="settings-email-pw">{t('settings.emailPassword')}</label>
               <input
                 id="settings-email-pw"
                 className="input"
                 type="password"
-                placeholder="Votre mot de passe actuel"
+                placeholder={t('settings.currentPassword')}
                 value={emailForm.confirmPassword}
                 onChange={(e) => { setEmailForm({ ...emailForm, confirmPassword: e.target.value }); setEmailMsg(''); }}
                 autoComplete="current-password"
@@ -186,17 +194,16 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
           )}
           <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
             <button className="btn btn--primary" type="button" onClick={handleChangeEmail} disabled={emailLoading}>
-              {emailLoading ? 'Modification…' : 'Changer l\'e-mail'}
+              {emailLoading ? t('settings.changing') : t('settings.changeEmailBtn')}
             </button>
           </div>
         </article>
 
-        {/* Changement de mot de passe */}
         <article className="card stack">
-          <h2>Changer le mot de passe</h2>
+          <h2>{t('settings.changePassword')}</h2>
           <div className="form-grid">
             <div>
-              <label className="form-label" htmlFor="settings-pw-current">Mot de passe actuel</label>
+              <label className="form-label" htmlFor="settings-pw-current">{t('settings.currentPassword')}</label>
               <input
                 id="settings-pw-current"
                 className="input"
@@ -207,7 +214,7 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
               />
             </div>
             <div>
-              <label className="form-label" htmlFor="settings-pw-new">Nouveau mot de passe</label>
+              <label className="form-label" htmlFor="settings-pw-new">{t('settings.newPassword')}</label>
               <input
                 id="settings-pw-new"
                 className="input"
@@ -218,7 +225,7 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
               />
             </div>
             <div>
-              <label className="form-label" htmlFor="settings-pw-confirm">Confirmer le nouveau mot de passe</label>
+              <label className="form-label" htmlFor="settings-pw-confirm">{t('settings.confirmPassword')}</label>
               <input
                 id="settings-pw-confirm"
                 className="input"
@@ -230,23 +237,23 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
             </div>
           </div>
           <div className="notice notice--info">
-            Règles : 8 caractères min., une majuscule, une minuscule, un chiffre, un caractère spécial.
+            {t('settings.passwordRules')}
           </div>
           {pwMsg && (
-            <div className={`notice ${pwMsg.includes('succès') ? 'notice--success' : 'notice--warning'}`} role="alert">
+            <div className={`notice ${pwSuccess ? 'notice--success' : 'notice--warning'}`} role="alert">
               {pwMsg}
             </div>
           )}
           <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
             <button className="btn btn--primary" type="button" onClick={handleChangePassword} disabled={pwLoading}>
-              {pwLoading ? 'Modification…' : 'Modifier le mot de passe'}
+              {pwLoading ? t('settings.changingPw') : t('settings.changePasswordBtn')}
             </button>
           </div>
         </article>
       </div>
 
       <div className="page-actions" style={{ marginTop: 32 }}>
-        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour au compte</button>
+        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>{t('settings.back')}</button>
       </div>
     </section>
   );

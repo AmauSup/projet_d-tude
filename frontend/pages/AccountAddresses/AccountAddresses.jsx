@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
+
+AccountAddresses.propTypes = {
+  onNavigate: PropTypes.func.isRequired,
+};
 
 const EMPTY_FORM = {
   label: '',
@@ -16,6 +22,7 @@ const EMPTY_FORM = {
 };
 
 export default function AccountAddresses({ onNavigate }) {
+  const { t } = useI18n();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +49,7 @@ export default function AccountAddresses({ onNavigate }) {
 
   const handleSubmit = async () => {
     if (!form.address1 || !form.city) {
-      setFormMsg('Adresse et ville sont obligatoires.');
+      setFormMsg(t('addresses.errorRequired'));
       return;
     }
     setFormLoading(true);
@@ -56,7 +63,7 @@ export default function AccountAddresses({ onNavigate }) {
       closeForm();
       load();
     } catch (err) {
-      setFormMsg(err.message || 'Erreur lors de la sauvegarde.');
+      setFormMsg(err.message || t('addresses.errorRequired'));
     } finally {
       setFormLoading(false);
     }
@@ -75,8 +82,8 @@ export default function AccountAddresses({ onNavigate }) {
   if (loading) {
     return (
       <section className="page">
-        <header className="page__header"><h1 className="page__title">Mes adresses</h1></header>
-        <div className="notice notice--info">Chargement…</div>
+        <header className="page__header"><h1 className="page__title">{t('addresses.title')}</h1></header>
+        <div className="notice notice--info">{t('addresses.loading')}</div>
       </section>
     );
   }
@@ -84,71 +91,69 @@ export default function AccountAddresses({ onNavigate }) {
   return (
     <section className="page">
       <header className="page__header">
-        <h1 className="page__title">Mes adresses</h1>
-        <p className="page__subtitle">Gérez vos adresses de livraison et de facturation.</p>
+        <h1 className="page__title">{t('addresses.title')}</h1>
+        <p className="page__subtitle">{t('addresses.subtitle')}</p>
       </header>
 
       {error && <div className="notice notice--warning" role="alert">{error}</div>}
 
-      {/* Modale de confirmation de suppression */}
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="card stack" style={{ maxWidth: 400 }}>
-            <h3>Supprimer l'adresse ?</h3>
-            <p>Cette action est irréversible.</p>
+            <h3>{t('addresses.deleteTitle')}</h3>
+            <p>{t('addresses.deleteConfirm')}</p>
             <div className="inline-actions">
-              <button className="btn btn--secondary" type="button" onClick={() => setDeleteConfirm(null)}>Annuler</button>
+              <button className="btn btn--secondary" type="button" onClick={() => setDeleteConfirm(null)}>{t('addresses.cancel')}</button>
               <button className="btn btn--primary" type="button" style={{ background: 'var(--color-danger, #c0392b)' }} onClick={() => handleDelete(deleteConfirm)}>
-                Supprimer
+                {t('addresses.delete')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Formulaire ajout / modification */}
       {form ? (
         <article className="card stack">
-          <h2>{form.id ? "Modifier l'adresse" : 'Ajouter une adresse'}</h2>
+          <h2>{form.id ? t('addresses.editTitle') : t('addresses.addTitle')}</h2>
           <div className="form-grid">
             <div>
-              <label className="form-label" htmlFor="addr-label">Libellé (ex : Domicile, Cabinet)</label>
+              <label className="form-label" htmlFor="addr-label">{t('addresses.label')}</label>
               <input id="addr-label" className="input" value={form.label} onChange={(e) => handleChange('label', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-firstname">Prénom</label>
+              <label className="form-label" htmlFor="addr-firstname">{t('addresses.firstName')}</label>
               <input id="addr-firstname" className="input" value={form.first_name} onChange={(e) => handleChange('first_name', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-lastname">Nom</label>
+              <label className="form-label" htmlFor="addr-lastname">{t('addresses.lastName')}</label>
               <input id="addr-lastname" className="input" value={form.last_name} onChange={(e) => handleChange('last_name', e.target.value)} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="addr-line1">Adresse <span aria-hidden="true">*</span></label>
+              <label className="form-label" htmlFor="addr-line1">{t('addresses.address1')} <span aria-hidden="true">*</span></label>
               <input id="addr-line1" className="input" value={form.address1} onChange={(e) => handleChange('address1', e.target.value)} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="addr-line2">Complément d'adresse</label>
+              <label className="form-label" htmlFor="addr-line2">{t('addresses.address2')}</label>
               <input id="addr-line2" className="input" value={form.address2} onChange={(e) => handleChange('address2', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-city">Ville <span aria-hidden="true">*</span></label>
+              <label className="form-label" htmlFor="addr-city">{t('addresses.city')} <span aria-hidden="true">*</span></label>
               <input id="addr-city" className="input" value={form.city} onChange={(e) => handleChange('city', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-postal">Code postal</label>
+              <label className="form-label" htmlFor="addr-postal">{t('addresses.postal')}</label>
               <input id="addr-postal" className="input" value={form.postal_code} onChange={(e) => handleChange('postal_code', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-region">Région / État</label>
+              <label className="form-label" htmlFor="addr-region">{t('addresses.region')}</label>
               <input id="addr-region" className="input" value={form.region} onChange={(e) => handleChange('region', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-country">Pays</label>
+              <label className="form-label" htmlFor="addr-country">{t('addresses.country')}</label>
               <input id="addr-country" className="input" value={form.country} onChange={(e) => handleChange('country', e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="addr-phone">Téléphone</label>
+              <label className="form-label" htmlFor="addr-phone">{t('addresses.phone')}</label>
               <input id="addr-phone" className="input" type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -158,48 +163,48 @@ export default function AccountAddresses({ onNavigate }) {
                   checked={form.is_default}
                   onChange={(e) => handleChange('is_default', e.target.checked)}
                 />{' '}
-                Définir comme adresse par défaut
+                {t('addresses.setDefault')}
               </label>
             </div>
           </div>
           {formMsg && <div className="notice notice--warning" role="alert">{formMsg}</div>}
           <div className="inline-actions">
-            <button className="btn btn--secondary" type="button" onClick={closeForm}>Annuler</button>
+            <button className="btn btn--secondary" type="button" onClick={closeForm}>{t('addresses.cancel')}</button>
             <button className="btn btn--primary" type="button" onClick={handleSubmit} disabled={formLoading}>
-              {formLoading ? 'Sauvegarde…' : 'Sauvegarder'}
+              {formLoading ? t('addresses.saving') : t('addresses.save')}
             </button>
           </div>
         </article>
       ) : (
         <div className="page-actions" style={{ justifyContent: 'flex-start', marginBottom: 16 }}>
-          <button className="btn btn--primary" type="button" onClick={openAdd}>+ Ajouter une adresse</button>
+          <button className="btn btn--primary" type="button" onClick={openAdd}>{t('addresses.add')}</button>
         </div>
       )}
 
       <div className="stack">
         {addresses.length === 0 && !form && (
-          <div className="notice notice--info">Aucune adresse enregistrée.</div>
+          <div className="notice notice--info">{t('addresses.none')}</div>
         )}
         {addresses.map((addr) => (
           <article className="card" key={addr.id}>
             <div className="inline-actions" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div>
                 {addr.label && <strong>{addr.label}</strong>}
-                {addr.is_default && <span className="status-pill status-pill--ok" style={{ marginLeft: 8 }}>Par défaut</span>}
+                {addr.is_default && <span className="status-pill status-pill--ok" style={{ marginLeft: 8 }}>{t('addresses.isDefault')}</span>}
                 <p>{addr.first_name} {addr.last_name}</p>
                 <p>{addr.address1}{addr.address2 ? `, ${addr.address2}` : ''}</p>
                 <p>{addr.postal_code} {addr.city}{addr.region ? `, ${addr.region}` : ''}</p>
                 <p>{addr.country}{addr.phone ? ` — ${addr.phone}` : ''}</p>
               </div>
               <div className="inline-actions">
-                <button className="btn btn--secondary" type="button" onClick={() => openEdit(addr)}>Modifier</button>
+                <button className="btn btn--secondary" type="button" onClick={() => openEdit(addr)}>{t('addresses.edit')}</button>
                 <button
                   className="btn btn--secondary"
                   type="button"
                   style={{ color: 'var(--color-danger, #c0392b)' }}
                   onClick={() => setDeleteConfirm(addr.id)}
                 >
-                  Supprimer
+                  {t('addresses.delete')}
                 </button>
               </div>
             </div>
@@ -208,7 +213,7 @@ export default function AccountAddresses({ onNavigate }) {
       </div>
 
       <div className="page-actions">
-        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour</button>
+        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>{t('addresses.back')}</button>
       </div>
     </section>
   );

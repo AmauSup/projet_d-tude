@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Chatbot.css';
 import { supportService } from '../../services/supportService.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 const FAQ = [
   {
@@ -25,11 +26,11 @@ const FAQ = [
   },
   {
     keywords: ['paiement', 'carte', 'moyen de paiement', 'payer', 'stripe', 'paypal'],
-    answer: 'Le paiement s\'effectue par carte bancaire lors du checkout. En mode démo, vous pouvez simuler un paiement sans carte réelle. Les données ne sont jamais stockées en clair.',
+    answer: "Le paiement s'effectue par carte bancaire lors du checkout. En mode démo, vous pouvez simuler un paiement sans carte réelle. Les données ne sont jamais stockées en clair.",
   },
   {
-    keywords: ['compte', 'inscription', 'créer', 'register', 's\'inscrire'],
-    answer: 'Pour créer un compte, cliquez sur "S\'inscrire" dans le menu ou sur la page de connexion. Vous aurez besoin d\'un e-mail professionnel et d\'un mot de passe fort (8 caractères min.).',
+    keywords: ['compte', 'inscription', 'créer', 'register', "s'inscrire"],
+    answer: "Pour créer un compte, cliquez sur \"S'inscrire\" dans le menu ou sur la page de connexion. Vous aurez besoin d'un e-mail professionnel et d'un mot de passe fort (8 caractères min.).",
   },
   {
     keywords: ['stock', 'rupture', 'disponible', 'indisponible'],
@@ -45,7 +46,9 @@ const FAQ = [
   },
 ];
 
-const WELCOME = 'Bonjour ! Je suis l\'assistant Althea Systems. Comment puis-je vous aider ? Vous pouvez me poser des questions sur votre compte, vos commandes, les produits ou le paiement.';
+const WELCOME_FR = "Bonjour ! Je suis l'assistant Althea Systems. Comment puis-je vous aider ? Vous pouvez me poser des questions sur votre compte, vos commandes, les produits ou le paiement.";
+const NO_ANSWER_FR = "Je n'ai pas trouvé de réponse précise à votre question. Souhaitez-vous être mis en relation avec un agent ?";
+const ESCALATED_FR = "Votre conversation a été transmise à notre équipe. Un agent vous contactera dans les 24h à l'adresse indiquée. Merci !";
 
 function findAnswer(input) {
   const normalized = input.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -54,19 +57,21 @@ function findAnswer(input) {
       return entry.answer;
     }
   }
-  return 'Je n\'ai pas trouvé de réponse précise à votre question. Souhaitez-vous être mis en relation avec un agent ?';
+  return NO_ANSWER_FR;
 }
 
-function buildTranscript(messages) {
-  return messages
+function buildTranscript(msgs) {
+  return msgs
     .filter((m) => m.from !== 'system')
     .map((m) => `[${m.from === 'bot' ? 'Bot' : 'Utilisateur'}] ${m.text}`)
     .join('\n');
 }
 
 export default function Chatbot() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{ from: 'bot', text: WELCOME }]);
+  const [messages, setMessages] = useState([{ id: 0, from: 'bot', text: WELCOME_FR }]);
+  const msgCounter = useRef(1);
   const [input, setInput] = useState('');
   const [escalating, setEscalating] = useState(false);
   const [escalateEmail, setEscalateEmail] = useState('');
@@ -86,9 +91,9 @@ export default function Chatbot() {
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
-    const userMsg = { from: 'user', text };
+    const userMsg = { id: msgCounter.current++, from: 'user', text };
     const answer = findAnswer(text);
-    const botMsg = { from: 'bot', text: answer };
+    const botMsg = { id: msgCounter.current++, from: 'bot', text: answer };
     setMessages((prev) => [...prev, userMsg, botMsg]);
     setInput('');
   };
@@ -104,24 +109,21 @@ export default function Chatbot() {
     setEscalating(false);
     setMessages((prev) => [
       ...prev,
-      {
-        from: 'bot',
-        text: 'Votre conversation a été transmise à notre équipe. Un agent vous contactera dans les 24h à l\'adresse indiquée. Merci !',
-      },
+      { id: msgCounter.current++, from: 'bot', text: ESCALATED_FR },
     ]);
   };
 
   return (
     <div className="chatbot-root">
       {open && (
-        <div className="chatbot-panel" role="dialog" aria-label="Assistant Althea Systems">
+        <dialog open className="chatbot-panel" aria-label={t('chatbot.ariaLabel')}>
           <div className="chatbot-header">
-            <span>💬 Assistant Althea</span>
-            <button type="button" className="chatbot-close" onClick={() => setOpen(false)} aria-label="Fermer le chat">✕</button>
+            <span>{t('chatbot.title')}</span>
+            <button type="button" className="chatbot-close" onClick={() => setOpen(false)} aria-label={t('chatbot.close')}>✕</button>
           </div>
           <div className="chatbot-messages">
-            {messages.map((msg, i) => (
-              <div key={i} className={`chatbot-msg chatbot-msg--${msg.from}`}>
+            {messages.map((msg) => (
+              <div key={msg.id} className={`chatbot-msg chatbot-msg--${msg.from}`}>
                 {msg.text}
               </div>
             ))}
@@ -130,18 +132,18 @@ export default function Chatbot() {
 
           {escalating && !escalated ? (
             <div className="chatbot-escalate-form">
-              <p className="helper-text">Saisissez votre e-mail pour qu'un agent vous recontacte :</p>
+              <p className="helper-text">{t('chatbot.escalateEmail')}</p>
               <input
                 className="input"
                 type="email"
-                placeholder="votre@email.fr"
+                placeholder={t('chatbot.emailPlaceholder')}
                 value={escalateEmail}
                 onChange={(e) => setEscalateEmail(e.target.value)}
-                aria-label="Votre adresse e-mail"
+                aria-label={t('chatbot.emailAriaLabel')}
               />
               <div className="chatbot-input-row" style={{ marginTop: 6 }}>
-                <button type="button" className="btn btn--secondary" onClick={() => setEscalating(false)}>Annuler</button>
-                <button type="button" className="btn btn--primary" onClick={handleEscalate}>Envoyer</button>
+                <button type="button" className="btn btn--secondary" onClick={() => setEscalating(false)}>{t('chatbot.cancel')}</button>
+                <button type="button" className="btn btn--primary" onClick={handleEscalate}>{t('chatbot.send')}</button>
               </div>
             </div>
           ) : (
@@ -149,14 +151,14 @@ export default function Chatbot() {
               <input
                 className="input chatbot-input"
                 type="text"
-                placeholder="Posez votre question…"
+                placeholder={t('chatbot.placeholder')}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
-                aria-label="Message"
+                aria-label={t('chatbot.placeholder')}
               />
               <button type="button" className="btn btn--primary chatbot-send" onClick={handleSend}>
-                Envoyer
+                {t('chatbot.send')}
               </button>
             </div>
           )}
@@ -168,17 +170,17 @@ export default function Chatbot() {
                 className="btn btn--link chatbot-escalate-btn"
                 onClick={() => setEscalating(true)}
               >
-                Parler à un agent humain
+                {t('chatbot.escalate')}
               </button>
             </div>
           )}
-        </div>
+        </dialog>
       )}
       <button
         type="button"
         className="chatbot-bubble"
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Fermer le chat' : 'Ouvrir le chat'}
+        aria-label={open ? t('chatbot.close') : t('chatbot.open')}
         aria-expanded={open}
       >
         {open ? '✕' : '💬'}

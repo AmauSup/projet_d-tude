@@ -2,33 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import './Account.css';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
-
-const ACCOUNT_NAV = [
-  {
-    path: '/account/settings',
-    icon: '⚙️',
-    title: 'Paramètres',
-    description: 'Modifier nom, e-mail et mot de passe',
-  },
-  {
-    path: '/account/addresses',
-    icon: '📍',
-    title: 'Mes adresses',
-    description: "Carnet d'adresses de livraison et facturation",
-  },
-  {
-    path: '/account/payments',
-    icon: '💳',
-    title: 'Mes paiements',
-    description: 'Cartes enregistrées (4 derniers chiffres)',
-  },
-  {
-    path: '/orders',
-    icon: '📦',
-    title: 'Mes commandes',
-    description: 'Historique, statuts et factures PDF',
-  },
-];
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 Account.propTypes = {
   user: PropTypes.shape({
@@ -43,16 +17,45 @@ Account.propTypes = {
 
 export default function Account({ user, session, orders = [], onNavigate }) {
   const { isDark, toggleTheme } = useTheme();
+  const { t } = useI18n();
+
+  const ACCOUNT_NAV = [
+    {
+      path: '/account/settings',
+      icon: '⚙️',
+      title: t('account.settingsTitle'),
+      description: t('account.settingsDesc'),
+    },
+    {
+      path: '/account/addresses',
+      icon: '📍',
+      title: t('account.addressesTitle'),
+      description: t('account.addressesDesc'),
+    },
+    {
+      path: '/account/payments',
+      icon: '💳',
+      title: t('account.paymentsTitle'),
+      description: t('account.paymentsDesc'),
+    },
+    {
+      path: '/orders',
+      icon: '📦',
+      title: t('account.ordersTitle'),
+      description: t('account.ordersDesc'),
+    },
+  ];
+
 	if (!session.isAuthenticated) {
 		return (
 			<section className="page account-page">
 				<header className="page__header">
-					<h1 className="page__title">Mon compte</h1>
-					<p className="page__subtitle">Connectez-vous pour accéder à votre profil, vos adresses et vos commandes.</p>
+					<h1 className="page__title">{t('account.title')}</h1>
+					<p className="page__subtitle">{t('account.signInSubtitle')}</p>
 				</header>
 				<div className="inline-actions">
-					<button className="btn btn--primary" type="button" onClick={() => onNavigate('/login')}>Se connecter</button>
-					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/register')}>Créer un compte</button>
+					<button className="btn btn--primary" type="button" onClick={() => onNavigate('/login')}>{t('account.signIn')}</button>
+					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/register')}>{t('account.createAccount')}</button>
 				</div>
 			</section>
 		);
@@ -61,9 +64,9 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 	return (
 		<section className="page account-page">
 			<header className="page__header">
-				<h1 className="page__title">Mon compte</h1>
+				<h1 className="page__title">{t('account.title')}</h1>
 				<p className="page__subtitle">
-					Bonjour {user.firstName ? `${user.firstName} ${user.lastName}` : user.email} — gérez votre profil, adresses, paiements et commandes.
+					{user.firstName ? `${user.firstName} ${user.lastName}` : user.email} — {t('account.subtitle')}
 				</p>
 			</header>
 
@@ -86,20 +89,20 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 				<div className="theme-toggle-card__left">
 					<span className="theme-toggle-card__icon" aria-hidden="true">{isDark ? '🌙' : '☀️'}</span>
 					<div>
-						<strong className="theme-toggle-card__title">Apparence</strong>
+						<strong className="theme-toggle-card__title">{t('account.appearance')}</strong>
 						<p className="account-nav-card__desc helper-text">
-							{isDark ? 'Thème sombre activé' : 'Thème clair activé'}
+							{isDark ? t('account.darkEnabled') : t('account.lightEnabled')}
 						</p>
 					</div>
 				</div>
 				<span className={`theme-pill ${isDark ? 'theme-pill--dark' : 'theme-pill--light'}`}>
-					{isDark ? 'Sombre' : 'Clair'}
+					{isDark ? t('account.darkLabel') : t('account.lightLabel')}
 				</span>
 			</button>
 
 			{orders.length > 0 && (
 				<article className="card stack" style={{ marginTop: 24 }}>
-					<h3>Dernières commandes</h3>
+					<h3>{t('account.recentOrders')}</h3>
 					<div className="stack">
 						{orders.slice(0, 3).map((order) => (
 							<div key={order.id} className="panel inline-actions" style={{ justifyContent: 'space-between' }}>
@@ -113,7 +116,7 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 					</div>
 					<div className="page-actions" style={{ justifyContent: 'flex-start' }}>
 						<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/orders')}>
-							Voir tout l'historique
+							{t('account.viewHistory')}
 						</button>
 					</div>
 				</article>

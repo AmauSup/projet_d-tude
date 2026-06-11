@@ -66,23 +66,22 @@ export default function Header({
     onNavigate(path);
   };
 
-  // Items du menu burger selon l'état d'authentification (spec)
   const burgerItemsGuest = [
-    { label: 'Se connecter', path: '/login' },
-    { label: "S'inscrire", path: '/register' },
-    { label: 'CGU', path: '/terms' },
-    { label: 'Mentions légales', path: '/legal' },
-    { label: 'Contact', path: '/contact' },
-    { label: 'À propos de Althea Systems', path: '/about' },
+    { label: t('nav.login'), path: '/login' },
+    { label: t('nav.register'), path: '/register' },
+    { label: t('nav.terms'), path: '/terms' },
+    { label: t('nav.legal'), path: '/legal' },
+    { label: t('nav.contact'), path: '/contact' },
+    { label: t('nav.about'), path: '/about' },
   ];
 
   const burgerItemsAuth = [
-    { label: 'Mes paramètres', path: '/account/settings' },
-    { label: 'Mes commandes', path: '/orders' },
-    { label: 'CGU', path: '/terms' },
-    { label: 'Mentions légales', path: '/legal' },
-    { label: 'Contact', path: '/contact' },
-    { label: 'À propos de Althea Systems', path: '/about' },
+    { label: t('nav.settings'), path: '/account/settings' },
+    { label: t('nav.orders'), path: '/orders' },
+    { label: t('nav.terms'), path: '/terms' },
+    { label: t('nav.legal'), path: '/legal' },
+    { label: t('nav.contact'), path: '/contact' },
+    { label: t('nav.about'), path: '/about' },
   ];
 
   const burgerItems = isAuthenticated ? burgerItemsAuth : burgerItemsGuest;
@@ -100,10 +99,10 @@ export default function Header({
             <input
               className="input"
               type="search"
-              placeholder="Rechercher un produit, une catégorie…"
+              placeholder={t('nav.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Recherche"
+              aria-label={t('nav.search')}
             />
             <button type="submit" className="btn btn--primary site-header__search-btn">
               {t('nav.search')}
@@ -180,7 +179,7 @@ export default function Header({
             <button
               type="button"
               className="site-header__burger"
-              aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
               aria-expanded={menuOpen}
               aria-controls="burger-menu"
               onClick={() => setMenuOpen((v) => !v)}
@@ -215,7 +214,7 @@ export default function Header({
                 className="burger-menu__item burger-menu__item--danger"
                 onClick={() => { setMenuOpen(false); onLogout(); }}
               >
-                Se déconnecter
+                {t('nav.logout')}
               </button>
             )}
             {isAdmin && (
@@ -224,7 +223,7 @@ export default function Header({
                 className="burger-menu__item"
                 onClick={() => go('/admin/dashboard')}
               >
-                Administration
+                {t('nav.admin')}
               </button>
             )}
             {/* Réseaux sociaux (contenu footer déplacé dans le burger sur mobile) */}

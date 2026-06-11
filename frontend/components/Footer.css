@@ -75,3 +75,16 @@
     display: none;
   }
 }
+
+[data-theme="dark"] .site-footer {
+  background: rgba(15, 23, 42, 0.97);
+  border-top-color: #334155;
+}
+
+[data-theme="dark"] .site-footer__container {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .site-footer__title {
+  color: #cbd5e1;
+}

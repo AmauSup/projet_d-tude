@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 AccountPayments.propTypes = {
   onNavigate: PropTypes.func.isRequired,
@@ -19,6 +20,7 @@ function maskNumber(last4) {
 }
 
 export default function AccountPayments({ onNavigate }) {
+  const { t } = useI18n();
   const [methods, setMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,7 +37,7 @@ export default function AccountPayments({ onNavigate }) {
     setLoading(true);
     apiClient.get('/pg/auth/payment-methods')
       .then((data) => setMethods(data.paymentMethods || []))
-      .catch((err) => setError(err.message || 'Erreur de chargement'))
+      .catch((err) => setError(err.message || t('app.loading')))
       .finally(() => setLoading(false));
   };
 
@@ -48,10 +50,10 @@ export default function AccountPayments({ onNavigate }) {
 
   const validateForm = () => {
     const errors = {};
-    if (!form.cardholder_name.trim()) errors.cardholder_name = 'Nom obligatoire.';
+    if (!form.cardholder_name.trim()) errors.cardholder_name = t('payments.errorName');
     const clean = form.card_number.replace(/\s/g, '');
-    if (!/^\d{13,19}$/.test(clean)) errors.card_number = 'Numéro invalide (13–19 chiffres).';
-    if (!/^\d{2}\/\d{2}$/.test(form.expiry)) errors.expiry = 'Format attendu : MM/AA.';
+    if (!/^\d{13,19}$/.test(clean)) errors.card_number = t('payments.errorNumber');
+    if (!/^\d{2}\/\d{2}$/.test(form.expiry)) errors.expiry = t('payments.errorExpiry');
     return errors;
   };
 
@@ -72,7 +74,7 @@ export default function AccountPayments({ onNavigate }) {
       setForm({ ...EMPTY_FORM });
       load();
     } catch (err) {
-      setFormMsg(err.message || 'Erreur lors de l\'ajout.');
+      setFormMsg(err.message || t('payments.errorName'));
     } finally {
       setFormLoading(false);
     }
@@ -81,10 +83,10 @@ export default function AccountPayments({ onNavigate }) {
   const handleSetDefault = async (id) => {
     try {
       await apiClient.patch(`/pg/auth/payment-methods/${id}/default`);
-      setFeedback('Carte définie par défaut.');
+      setFeedback(t('payments.feedbackDefault'));
       load();
     } catch (err) {
-      setFeedback(err.message || 'Erreur.');
+      setFeedback(err.message || '');
     }
   };
 
@@ -92,54 +94,52 @@ export default function AccountPayments({ onNavigate }) {
     try {
       await apiClient.delete(`/pg/auth/payment-methods/${id}`);
       setDeleteConfirm(null);
-      setFeedback('Carte supprimée.');
+      setFeedback(t('payments.feedbackDeleted'));
       load();
     } catch (err) {
-      setFeedback(err.message || 'Erreur lors de la suppression.');
+      setFeedback(err.message || '');
     }
   };
 
   return (
     <section className="page">
       <header className="page__header">
-        <h1 className="page__title">Mes moyens de paiement</h1>
-        <p className="page__subtitle">Gérez vos cartes enregistrées. Seuls les 4 derniers chiffres sont conservés.</p>
+        <h1 className="page__title">{t('payments.title')}</h1>
+        <p className="page__subtitle">{t('payments.subtitle')}</p>
       </header>
 
       {error && <div className="notice notice--warning" role="alert">{error}</div>}
       {feedback && <output className="notice notice--success">{feedback}</output>}
 
-      {/* Modale de confirmation de suppression */}
       {deleteConfirm && (
         <dialog open className="modal-overlay" aria-modal="true">
           <div className="card stack" style={{ maxWidth: 400 }}>
-            <h3>Supprimer cette carte ?</h3>
-            <p>Cette action est irréversible.</p>
+            <h3>{t('payments.deleteTitle')}</h3>
+            <p>{t('payments.deleteConfirm')}</p>
             <div className="inline-actions">
-              <button className="btn btn--secondary" type="button" onClick={() => setDeleteConfirm(null)}>Annuler</button>
+              <button className="btn btn--secondary" type="button" onClick={() => setDeleteConfirm(null)}>{t('payments.cancel')}</button>
               <button
                 className="btn btn--primary"
                 type="button"
                 style={{ background: 'var(--color-danger, #c0392b)' }}
                 onClick={() => handleDelete(deleteConfirm)}
               >
-                Supprimer
+                {t('payments.delete')}
               </button>
             </div>
           </div>
         </dialog>
       )}
 
-      {/* Formulaire ajout */}
       {showForm && (
         <article className="card stack" ref={formRef}>
-          <h2>Ajouter une carte</h2>
+          <h2>{t('payments.addTitle')}</h2>
           <div className="notice notice--info">
-            Vos données de carte ne sont pas stockées — seuls les 4 derniers chiffres et la date d'expiration sont conservés.
+            {t('payments.addInfo')}
           </div>
           <form className="form-grid" onSubmit={handleAdd} noValidate>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="pm-name">Nom sur la carte *</label>
+              <label className="form-label" htmlFor="pm-name">{t('payments.cardholderName')}</label>
               <input
                 id="pm-name"
                 className={`input${formErrors.cardholder_name ? ' input--error' : ''}`}
@@ -151,7 +151,7 @@ export default function AccountPayments({ onNavigate }) {
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="pm-number">Numéro de carte *</label>
+              <label className="form-label" htmlFor="pm-number">{t('payments.cardNumber')}</label>
               <input
                 id="pm-number"
                 className={`input${formErrors.card_number ? ' input--error' : ''}`}
@@ -165,7 +165,7 @@ export default function AccountPayments({ onNavigate }) {
             </div>
 
             <div>
-              <label className="form-label" htmlFor="pm-expiry">Expiration *</label>
+              <label className="form-label" htmlFor="pm-expiry">{t('payments.expiry')}</label>
               <input
                 id="pm-expiry"
                 className={`input${formErrors.expiry ? ' input--error' : ''}`}
@@ -184,7 +184,7 @@ export default function AccountPayments({ onNavigate }) {
             </div>
 
             <div>
-              <label className="form-label" htmlFor="pm-cvv">CVV</label>
+              <label className="form-label" htmlFor="pm-cvv">{t('payments.cvv')}</label>
               <input
                 id="pm-cvv"
                 className="input"
@@ -195,7 +195,7 @@ export default function AccountPayments({ onNavigate }) {
                 autoComplete="cc-csc"
                 type="password"
               />
-              <p className="helper-text">Le CVV n'est jamais stocké.</p>
+              <p className="helper-text">{t('payments.cvvInfo')}</p>
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
@@ -205,7 +205,7 @@ export default function AccountPayments({ onNavigate }) {
                   checked={form.is_default}
                   onChange={(e) => set('is_default', e.target.checked)}
                 />{' '}
-                Définir comme carte par défaut
+                {t('payments.setDefault')}
               </label>
             </div>
 
@@ -213,10 +213,10 @@ export default function AccountPayments({ onNavigate }) {
 
             <div className="inline-actions" style={{ gridColumn: '1 / -1' }}>
               <button className="btn btn--secondary" type="button" onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM }); setFormErrors({}); }}>
-                Annuler
+                {t('payments.cancel')}
               </button>
               <button className="btn btn--primary" type="submit" disabled={formLoading}>
-                {formLoading ? 'Ajout en cours…' : 'Ajouter la carte'}
+                {formLoading ? t('payments.adding') : t('payments.addBtn')}
               </button>
             </div>
           </form>
@@ -226,28 +226,28 @@ export default function AccountPayments({ onNavigate }) {
       {!showForm && (
         <div className="page-actions" style={{ justifyContent: 'flex-start', marginBottom: 16 }}>
           <button className="btn btn--primary" type="button" onClick={() => { setShowForm(true); setFeedback(''); setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}>
-            + Ajouter une carte
+            {t('payments.add')}
           </button>
         </div>
       )}
 
       {loading ? (
-        <div className="notice notice--info">Chargement…</div>
+        <div className="notice notice--info">{t('payments.loading')}</div>
       ) : (
         <div className="stack">
           {methods.length === 0 && !showForm && (
-            <div className="notice notice--info">Aucune carte enregistrée.</div>
+            <div className="notice notice--info">{t('payments.none')}</div>
           )}
           {methods.map((pm) => (
             <article className="card" key={pm.id}>
               <div className="inline-actions" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
                 <div>
                   {pm.is_default && (
-                    <span className="status-pill status-pill--ok" style={{ marginBottom: 6, display: 'inline-block' }}>Par défaut</span>
+                    <span className="status-pill status-pill--ok" style={{ marginBottom: 6, display: 'inline-block' }}>{t('payments.isDefault')}</span>
                   )}
                   <p><strong>{pm.cardholder_name}</strong></p>
                   <p>{maskNumber(pm.last4)}</p>
-                  <p className="helper-text">Expire {String(pm.expiry_month).padStart(2, '0')}/{pm.expiry_year}</p>
+                  <p className="helper-text">{t('payments.expires')} {String(pm.expiry_month).padStart(2, '0')}/{pm.expiry_year}</p>
                 </div>
                 <div className="inline-actions">
                   {!pm.is_default && (
@@ -256,7 +256,7 @@ export default function AccountPayments({ onNavigate }) {
                       type="button"
                       onClick={() => handleSetDefault(pm.id)}
                     >
-                      Définir par défaut
+                      {t('payments.setDefaultBtn')}
                     </button>
                   )}
                   <button
@@ -265,7 +265,7 @@ export default function AccountPayments({ onNavigate }) {
                     style={{ color: 'var(--color-danger, #c0392b)' }}
                     onClick={() => { setDeleteConfirm(pm.id); setFeedback(''); }}
                   >
-                    Supprimer
+                    {t('payments.delete')}
                   </button>
                 </div>
               </div>
@@ -275,7 +275,7 @@ export default function AccountPayments({ onNavigate }) {
       )}
 
       <div className="page-actions">
-        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour</button>
+        <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>{t('payments.back')}</button>
       </div>
     </section>
   );

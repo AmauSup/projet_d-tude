@@ -57,6 +57,16 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 					<button className="btn btn--primary" type="button" onClick={() => onNavigate('/login')}>{t('account.signIn')}</button>
 					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/register')}>{t('account.createAccount')}</button>
 				</div>
+				<p className="helper-text" style={{ marginTop: 20 }}>
+					Compte créé mais lien expiré ?{' '}
+					<button
+						type="button"
+						className="btn btn--link"
+						onClick={() => onNavigate('/resend-verification')}
+					>
+						Renvoyer le lien de confirmation
+					</button>
+				</p>
 			</section>
 		);
 	}

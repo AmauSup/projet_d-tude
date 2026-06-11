@@ -77,12 +77,15 @@ export default function Register({ onRegister, onNavigate }) {
 					<p className="page__subtitle">Un e-mail de confirmation a été envoyé à <strong>{form.email}</strong>.</p>
 				</header>
 				<output className="notice notice--success" style={{ display: 'block' }}>
-					<strong>Compte créé !</strong> Cliquez sur le lien dans l&apos;e-mail pour activer votre compte (valable 24h).
+					<strong>Compte créé !</strong> Cliquez sur le lien dans l&apos;e-mail pour activer votre compte (valable 72h).
 					Vous pouvez naviguer sur le site, mais certaines fonctionnalités nécessitent une connexion après confirmation.
 				</output>
 				<div className="page-actions">
 					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/')}>
 						Parcourir le catalogue
+					</button>
+					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/resend-verification')}>
+						Renvoyer le lien
 					</button>
 					<button className="btn btn--primary" type="button" onClick={() => onNavigate('/login')}>
 						Se connecter

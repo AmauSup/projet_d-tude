@@ -26,6 +26,7 @@ import AccountPayments from './pages/AccountPayments/AccountPayments.jsx';
 import TermsPage from './pages/Static/TermsPage.jsx';
 import LegalPage from './pages/Static/LegalPage.jsx';
 import AboutPage from './pages/Static/AboutPage.jsx';
+import RGPDPage from './pages/Static/RGPDPage.jsx';
 import NotFound from './pages/NotFound/NotFound.jsx';
 import AdminLayout from './pages/Admin/AdminLayout.jsx';
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx';
@@ -788,7 +789,7 @@ export default function App() {
             path="/account/settings"
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <AccountSettings user={userProfile} onSave={handleSaveAccount} onNavigate={navigate} />
+                <AccountSettings user={userProfile} onSave={handleSaveAccount} onNavigate={navigate} onLogout={handleLogout} />
               </RequireAuth>
             }
           />
@@ -815,7 +816,7 @@ export default function App() {
             path="/orders"
             element={
               <RequireAuth isAuthenticated={session.isAuthenticated}>
-                <OrderHistory orders={orders} products={products} onNavigate={navigate} />
+                <OrderHistory orders={orders} products={products} onNavigate={navigate} onAddToCart={handleAddToCart} />
               </RequireAuth>
             }
           />
@@ -827,6 +828,7 @@ export default function App() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/rgpd" element={<RGPDPage />} />
 
           <Route
             path="/admin"

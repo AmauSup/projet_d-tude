@@ -44,9 +44,10 @@ OrderHistory.propTypes = {
     priceCents: PropTypes.number,
   })),
   onNavigate: PropTypes.func.isRequired,
+  onAddToCart: PropTypes.func,
 };
 
-export default function OrderHistory({ orders = [], products = [], onNavigate }) {
+export default function OrderHistory({ orders = [], products = [], onNavigate, onAddToCart }) {
 	const [expanded, setExpanded] = useState(null);
 	const [search, setSearch] = useState('');
 	const [yearFilter, setYearFilter] = useState('all');
@@ -187,14 +188,26 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 												<p>{order.paymentSummary}</p>
 											</>
 										) : null}
-										<div className="page-actions" style={{ justifyContent: 'flex-start' }}>
+										<div className="page-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>
 											<button
 												type="button"
 												className="btn btn--secondary"
 												onClick={() => downloadInvoice(order.id)}
 											>
-												📄 Télécharger la facture PDF
+												Télécharger la facture PDF
 											</button>
+											{onAddToCart && (
+												<button
+													type="button"
+													className="btn btn--primary"
+													onClick={() => {
+														order.items.forEach((item) => onAddToCart(item.productId, item.quantity));
+														onNavigate('/cart');
+													}}
+												>
+													Renouveler la commande
+												</button>
+											)}
 										</div>
 									</div>
 								) : null}

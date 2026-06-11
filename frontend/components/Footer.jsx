@@ -20,6 +20,7 @@ export default function Footer({ onNavigate }) {
 					<button type="button" onClick={() => onNavigate('/contact')}>{t('nav.contact')}</button>
 					<button type="button" onClick={() => onNavigate('/terms')}>{t('nav.terms')}</button>
 					<button type="button" onClick={() => onNavigate('/legal')}>{t('nav.legal')}</button>
+					<button type="button" onClick={() => onNavigate('/rgpd')}>RGPD</button>
 					<button type="button" onClick={() => onNavigate('/about')}>{t('nav.about')}</button>
 					<button type="button" onClick={() => onNavigate('/account')}>{t('nav.account')}</button>
 					<button type="button" onClick={() => onNavigate('/admin/dashboard')}>{t('nav.admin')}</button>

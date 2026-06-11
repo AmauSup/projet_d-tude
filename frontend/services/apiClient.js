@@ -69,7 +69,7 @@ export const apiClient = {
   patch(path, body) {
     return request(path, { method: 'PATCH', body });
   },
-  delete(path) {
-    return request(path, { method: 'DELETE' });
+  delete(path, body) {
+    return request(path, { method: 'DELETE', body });
   },
 };

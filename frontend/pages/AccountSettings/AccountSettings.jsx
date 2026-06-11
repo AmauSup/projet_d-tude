@@ -11,9 +11,10 @@ AccountSettings.propTypes = {
   }),
   onSave: PropTypes.func.isRequired,
   onNavigate: PropTypes.func.isRequired,
+  onLogout: PropTypes.func,
 };
 
-export default function AccountSettings({ user = {}, onSave, onNavigate }) {
+export default function AccountSettings({ user = {}, onSave, onNavigate, onLogout }) {
   const { t } = useI18n();
   const [profile, setProfile] = useState({
     firstName: user.firstName || '',
@@ -32,6 +33,11 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
   const [emailMsg, setEmailMsg] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState(false);
+
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteMsg, setDeleteMsg] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const handleSaveProfile = async () => {
     setProfileLoading(true);
@@ -82,6 +88,24 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setDeleteMsg('Veuillez saisir votre mot de passe pour confirmer la suppression.');
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteMsg('');
+    try {
+      await apiClient.delete('/pg/auth/account', { password: deletePassword });
+      if (onLogout) onLogout();
+      else onNavigate('/');
+    } catch (err) {
+      setDeleteMsg(err.message || 'Erreur lors de la suppression du compte.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleChangePassword = async () => {
     if (!passwords.current) {
       setPwMsg(t('settings.errorNeedCurrent'));
@@ -100,7 +124,7 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
     setPwSuccess(false);
     try {
       await apiClient.put('/pg/auth/password', {
-        currentPassword: passwords.current,
+        oldPassword: passwords.current,
         newPassword: passwords.next,
       });
       setPasswords({ current: '', next: '', confirm: '' });
@@ -251,6 +275,64 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
           </div>
         </article>
       </div>
+
+        <article className="card stack" style={{ borderColor: '#fca5a5' }}>
+          <h2 style={{ color: '#b91c1c' }}>Supprimer mon compte</h2>
+          <div className="notice notice--warning">
+            Cette action est <strong>irréversible</strong>. Toutes vos données (commandes, adresses,
+            méthodes de paiement) seront définitivement supprimées conformément au RGPD.
+          </div>
+          {!deleteConfirm ? (
+            <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                style={{ color: '#b91c1c', borderColor: '#fca5a5', background: '#fff1f2' }}
+                onClick={() => setDeleteConfirm(true)}
+              >
+                Supprimer mon compte
+              </button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="form-label" htmlFor="settings-delete-pw">
+                  Confirmez votre mot de passe pour supprimer le compte
+                </label>
+                <input
+                  id="settings-delete-pw"
+                  className="input"
+                  type="password"
+                  placeholder="Mot de passe actuel"
+                  value={deletePassword}
+                  onChange={(e) => { setDeletePassword(e.target.value); setDeleteMsg(''); }}
+                  autoComplete="current-password"
+                />
+              </div>
+              {deleteMsg && (
+                <div className="notice notice--warning" role="alert">{deleteMsg}</div>
+              )}
+              <div className="inline-actions">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => { setDeleteConfirm(false); setDeletePassword(''); setDeleteMsg(''); }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ background: 'linear-gradient(135deg, #b91c1c, #dc2626)', boxShadow: '0 8px 18px rgba(239,68,68,0.25)' }}
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Suppression…' : 'Confirmer la suppression définitive'}
+                </button>
+              </div>
+            </>
+          )}
+        </article>
 
       <div className="page-actions" style={{ marginTop: 32 }}>
         <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>{t('settings.back')}</button>

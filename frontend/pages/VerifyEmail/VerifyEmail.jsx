@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient, persistAuthToken } from '../../services/apiClient.js';
@@ -13,8 +13,14 @@ export default function VerifyEmail({ onVerified, onNavigate }) {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState('loading'); // 'loading' | 'success' | 'error'
   const { showToast } = useToast();
+  const didVerify = useRef(false);
 
   useEffect(() => {
+    // Guard against React StrictMode double-invocation which would consume the
+    // one-time token on the first call and make the second call fail.
+    if (didVerify.current) return;
+    didVerify.current = true;
+
     const token = searchParams.get('token');
     if (!token) {
       setStatus('error');
@@ -67,14 +73,14 @@ export default function VerifyEmail({ onVerified, onNavigate }) {
     <section className="page auth-page">
       <header className="page__header">
         <h1 className="page__title">Vérification échouée</h1>
-        <p className="page__subtitle">Le lien est invalide ou a expiré. Veuillez vous connecter ou créer un nouveau compte.</p>
+        <p className="page__subtitle">Le lien est invalide ou expiré.</p>
       </header>
-      <div className="page-actions">
+      <div className="page-actions" style={{ justifyContent: 'flex-start', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
+        <button className="btn btn--primary" type="button" onClick={() => onNavigate('/resend-verification')}>
+          Recevoir un nouveau lien
+        </button>
         <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/login')}>
           Se connecter
-        </button>
-        <button className="btn btn--primary" type="button" onClick={() => onNavigate('/register')}>
-          Créer un compte
         </button>
       </div>
     </section>

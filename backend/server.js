@@ -242,9 +242,9 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
       });
     }
 
-    // Créer un token de vérification valable 24h
+    // Créer un token de vérification valable 72h
     const verificationToken = require('node:crypto').randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationExpires = new Date(Date.now() + 72 * 60 * 60 * 1000);
     await pool.query(
       'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, verificationToken, verificationExpires],
@@ -278,7 +278,7 @@ app.post('/api/pg/auth/login', rateLimit(15 * 60 * 1000, 20), async (req, res) =
     if (!valid) return res.status(401).json({ message: 'Identifiants invalides.' });
 
     // Vérification email obligatoire avant connexion (seulement si SMTP configuré)
-    if (process.env.SMTP_HOST && user.email_verified === false) {
+    if (process.env.SMTP_HOST && !user.email_verified) {
       return res.status(403).json({
         message: 'Compte non confirmé. Veuillez cliquer sur le lien reçu par e-mail pour activer votre compte.',
         unconfirmed: true,
@@ -323,14 +323,37 @@ app.get('/api/pg/auth/verify-email', async (req, res) => {
   const { token } = req.query;
   if (!token) return res.status(400).json({ message: 'Token manquant.' });
   try {
+    // Cherche le token valide (non expiré) — qu'il soit déjà utilisé ou non
     const { rows } = await pool.query(
-      'SELECT * FROM email_verification_token WHERE token=$1 AND used_at IS NULL AND expires_at > NOW()',
+      `SELECT t.*, u.email_verified AS already_verified
+       FROM email_verification_token t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.token = $1 AND t.expires_at > NOW()`,
       [token],
     );
-    if (!rows[0]) return res.status(400).json({ message: 'Lien invalide ou expiré.' });
-    await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1', [rows[0].user_id]);
-    await pool.query('UPDATE email_verification_token SET used_at=NOW() WHERE id=$1', [rows[0].id]);
-    const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id=$1', [rows[0].user_id]);
+    if (!rows[0]) return res.status(400).json({ message: 'Lien invalide ou expiré. Demandez un nouveau lien via la page de renvoi.' });
+
+    const tokenRow = rows[0];
+
+    // Idempotent : si le token a déjà été consommé mais le compte est bien vérifié
+    // (ex : double-clic, rechargement page, React StrictMode en dev), on retourne succès.
+    if (tokenRow.used_at !== null) {
+      if (tokenRow.already_verified) {
+        const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id=$1', [tokenRow.user_id]);
+        const user = userRows[0];
+        const jwtToken = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+        return res.json({
+          success: true,
+          token: jwtToken,
+          user: { id: user.id, email: user.email, last_name: user.last_name, first_name: user.first_name, role: user.is_admin ? 'admin' : 'customer', is_admin: user.is_admin },
+        });
+      }
+      return res.status(400).json({ message: 'Lien déjà utilisé. Demandez un nouveau lien.' });
+    }
+
+    await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1', [tokenRow.user_id]);
+    await pool.query('UPDATE email_verification_token SET used_at=NOW() WHERE id=$1', [tokenRow.id]);
+    const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id=$1', [tokenRow.user_id]);
     const user = userRows[0];
     const jwtToken = jwt.sign({ id: user.id, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     mailer.sendWelcome(user).catch((e) => console.warn('[mailer welcome]', e.message));
@@ -354,7 +377,7 @@ app.post('/api/pg/auth/resend-verification', rateLimit(15 * 60 * 1000, 5), async
     if (!rows[0]) return res.json({ success: true }); // Pas de révélation si l'email existe
     const user = rows[0];
     const verificationToken = require('node:crypto').randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationExpires = new Date(Date.now() + 72 * 60 * 60 * 1000);
     await pool.query(
       'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, verificationToken, verificationExpires],
@@ -944,6 +967,34 @@ app.put('/api/pg/auth/password', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[change password]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// --- SUPPRESSION DE COMPTE (RGPD) ---
+app.delete('/api/pg/auth/account', authenticateToken, async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ message: 'Mot de passe requis pour confirmer la suppression.' });
+  try {
+    const { rows } = await pool.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+    const valid = await bcrypt.compare(password, rows[0].password);
+    if (!valid) return res.status(401).json({ message: 'Mot de passe incorrect.' });
+    await pool.query('BEGIN');
+    try {
+      await pool.query('DELETE FROM email_verification_token WHERE user_id = $1', [req.user.id]);
+      await pool.query('DELETE FROM password_reset_token WHERE user_id = $1', [req.user.id]);
+      await pool.query('DELETE FROM orders WHERE user_id = $1', [req.user.id]);
+      await pool.query('DELETE FROM payment_method WHERE user_id = $1', [req.user.id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+      await pool.query('COMMIT');
+    } catch (innerErr) {
+      await pool.query('ROLLBACK');
+      throw innerErr;
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[delete account]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur lors de la suppression du compte.' });
   }
 });
 

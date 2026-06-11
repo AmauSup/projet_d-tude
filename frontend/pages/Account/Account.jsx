@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import './Account.css';
+import { useTheme } from '../../contexts/ThemeContext.jsx';
 
 const ACCOUNT_NAV = [
   {
@@ -41,6 +42,7 @@ Account.propTypes = {
 };
 
 export default function Account({ user, session, orders = [], onNavigate }) {
+  const { isDark, toggleTheme } = useTheme();
 	if (!session.isAuthenticated) {
 		return (
 			<section className="page account-page">
@@ -79,6 +81,21 @@ export default function Account({ user, session, orders = [], onNavigate }) {
 					</button>
 				))}
 			</div>
+
+			<button type="button" className="theme-toggle-card" onClick={toggleTheme}>
+				<div className="theme-toggle-card__left">
+					<span className="theme-toggle-card__icon" aria-hidden="true">{isDark ? '🌙' : '☀️'}</span>
+					<div>
+						<strong className="theme-toggle-card__title">Apparence</strong>
+						<p className="account-nav-card__desc helper-text">
+							{isDark ? 'Thème sombre activé' : 'Thème clair activé'}
+						</p>
+					</div>
+				</div>
+				<span className={`theme-pill ${isDark ? 'theme-pill--dark' : 'theme-pill--light'}`}>
+					{isDark ? 'Sombre' : 'Clair'}
+				</span>
+			</button>
 
 			{orders.length > 0 && (
 				<article className="card stack" style={{ marginTop: 24 }}>

@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import './Search.css';
 import { formatPrice } from '../../utils/storefront.js';
 import Pagination from '../../components/Pagination/Pagination.jsx';
+import ImageWithLoader from '../../components/common/ImageWithLoader.jsx';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 const PAGE_SIZE = 12;
 
@@ -25,6 +27,7 @@ export default function Search({
   results = [],
   onOpenProduct,
 }) {
+  const { t } = useI18n();
   const [page, setPage] = useState(1);
 
   const updateCriteria = (name, value) => {
@@ -41,34 +44,32 @@ export default function Search({
   return (
     <section className="page search-page">
       <header className="page__header">
-        <h1 className="page__title">Recherche</h1>
-        <p className="page__subtitle">
-          Recherche multi-critères avec correspondance floue (jusqu'à 2 fautes de frappe).
-        </p>
+        <h1 className="page__title">{t('search.title')}</h1>
+        <p className="page__subtitle">{t('search.subtitle')}</p>
       </header>
 
       <div className="search-layout">
         <aside className="search-filters panel">
-          <h3>Filtres avancés</h3>
+          <h3>{t('search.advancedFilters')}</h3>
 
           <div className="stack">
             <input
               className="input"
-              placeholder="Nom / titre"
+              placeholder={t('search.namePlaceholder')}
               value={criteria.query}
               onChange={(event) => updateCriteria('query', event.target.value)}
             />
 
             <input
               className="input"
-              placeholder="Description"
+              placeholder={t('search.descriptionPlaceholder')}
               value={criteria.description}
               onChange={(event) => updateCriteria('description', event.target.value)}
             />
 
             <input
               className="input"
-              placeholder="Caractéristique technique"
+              placeholder={t('search.technicalPlaceholder')}
               value={criteria.technical}
               onChange={(event) => updateCriteria('technical', event.target.value)}
             />
@@ -78,7 +79,7 @@ export default function Search({
               value={criteria.categoryId}
               onChange={(event) => updateCriteria('categoryId', event.target.value)}
             >
-              <option value="all">Toutes les catégories</option>
+              <option value="all">{t('search.allCategories')}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -91,7 +92,7 @@ export default function Search({
                 className="input"
                 type="number"
                 min="0"
-                placeholder="Prix min"
+                placeholder={t('search.priceMin')}
                 value={criteria.minPrice}
                 onChange={(event) => updateCriteria('minPrice', event.target.value)}
               />
@@ -99,7 +100,7 @@ export default function Search({
                 className="input"
                 type="number"
                 min="0"
-                placeholder="Prix max"
+                placeholder={t('search.priceMax')}
                 value={criteria.maxPrice}
                 onChange={(event) => updateCriteria('maxPrice', event.target.value)}
               />
@@ -111,7 +112,7 @@ export default function Search({
                 checked={criteria.availableOnly}
                 onChange={(event) => updateCriteria('availableOnly', event.target.checked)}
               />
-              {' '}Uniquement les produits disponibles
+              {' '}{t('search.availableOnly')}
             </label>
 
             <div className="search-price-row">
@@ -120,10 +121,10 @@ export default function Search({
                 value={criteria.sortBy}
                 onChange={(event) => updateCriteria('sortBy', event.target.value)}
               >
-                <option value="relevance">Pertinence</option>
-                <option value="price">Prix</option>
-                <option value="createdAt">Nouveauté</option>
-                <option value="availability">Disponibilité</option>
+                <option value="relevance">{t('search.sortRelevance')}</option>
+                <option value="price">{t('search.sortPrice')}</option>
+                <option value="createdAt">{t('search.sortNew')}</option>
+                <option value="availability">{t('search.sortAvailability')}</option>
               </select>
 
               <select
@@ -131,8 +132,8 @@ export default function Search({
                 value={criteria.sortDirection}
                 onChange={(event) => updateCriteria('sortDirection', event.target.value)}
               >
-                <option value="asc">Croissant / priorité dispo</option>
-                <option value="desc">Décroissant / priorité rupture</option>
+                <option value="asc">{t('search.sortAsc')}</option>
+                <option value="desc">{t('search.sortDesc')}</option>
               </select>
             </div>
           </div>
@@ -142,16 +143,14 @@ export default function Search({
           <div className="search-results card-grid">
             {paginated.map((product) => (
               <article className="card" key={product.id}>
-                {product.image ? (
-                  <img className="card__image" src={product.image} alt={product.name} />
-                ) : (
-                  <div className="card__image" />
-                )}
+                <ImageWithLoader className="card__image" src={product.image} alt={product.name} />
                 <h3>{product.name}</h3>
                 <p>{product.shortDescription}</p>
 
                 <span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
-                  {product.availableStock > 0 ? `${product.availableStock} en stock` : 'En rupture de stock'}
+                  {product.availableStock > 0
+                    ? `${product.availableStock} ${t('search.inStock')}`
+                    : t('search.outOfStock')}
                 </span>
 
                 <strong>{formatPrice(product.priceCents)}</strong>
@@ -161,13 +160,13 @@ export default function Search({
                   type="button"
                   onClick={() => onOpenProduct(product.slug)}
                 >
-                  Voir le produit
+                  {t('search.viewProduct')}
                 </button>
               </article>
             ))}
 
             {paginated.length === 0 && (
-              <div className="notice notice--warning">Aucun résultat pour ces critères.</div>
+              <div className="notice notice--warning">{t('search.noResults')}</div>
             )}
           </div>
 
@@ -175,10 +174,10 @@ export default function Search({
         </div>
 
         <aside className="search-summary">
-          <h3>Résumé</h3>
-          <p><strong>{results.length}</strong> résultat(s)</p>
-          <p>Recherche floue : exact → inclusion → préfixe → distance 1 → distance 2.</p>
-          <p>Tri actif : {criteria.sortBy} / {criteria.sortDirection}</p>
+          <h3>{t('search.summaryTitle')}</h3>
+          <p><strong>{results.length}</strong> {t('search.results')}</p>
+          <p>{t('search.fuzzyInfo')}</p>
+          <p>{t('search.sortActive')} {criteria.sortBy} / {criteria.sortDirection}</p>
         </aside>
       </div>
     </section>

@@ -64,6 +64,104 @@
   font-size: 0.85rem;
 }
 
+/* Toggle apparence */
+.theme-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  width: 100%;
+  transition: all 0.22s ease;
+  margin-top: 16px;
+}
+
+.theme-toggle-card:hover {
+  border-color: #0369a1;
+  box-shadow: 0 8px 24px rgba(3, 105, 161, 0.12);
+  transform: translateY(-2px);
+}
+
+.theme-toggle-card__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.theme-toggle-card__icon {
+  font-size: 1.6rem;
+}
+
+.theme-toggle-card__title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.theme-pill {
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.theme-pill--light {
+  background: #fef3c7;
+  color: #78350f;
+}
+
+.theme-pill--dark {
+  background: #0c2a3f;
+  color: #7dd3fc;
+}
+
+/* ── Thème sombre ── */
+[data-theme="dark"] .account-sections .panel {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .account-nav-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .account-nav-card:hover {
+  border-color: #0284c7;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.2);
+}
+
+[data-theme="dark"] .account-nav-card__title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .theme-toggle-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .theme-toggle-card:hover {
+  border-color: #0284c7;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.2);
+}
+
+[data-theme="dark"] .theme-toggle-card__title {
+  color: #f1f5f9;
+}
+
 @media (max-width: 600px) {
   .account-nav-grid {
     grid-template-columns: 1fr;

@@ -153,7 +153,7 @@ export default function Header({
                   <button type="button" className="site-header__utility" onClick={() => go('/account')}>
                     {t('nav.account')}
                   </button>
-                  <button type="button" className="site-header__link" onClick={onLogout}>
+                  <button type="button" className="site-header__utility" onClick={onLogout}>
                     {t('nav.logout')}
                   </button>
                 </>

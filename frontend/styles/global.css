@@ -147,12 +147,12 @@ h3 {
 
 .btn--primary {
   color: #ffffff;
-  background: linear-gradient(135deg, var(--primary), #06b6d4);
+  background: linear-gradient(135deg, #0369a1, #0284c7);
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.25);
 }
 
 .btn--primary:hover {
-  background: linear-gradient(135deg, var(--primary-dark), #0891b2);
+  background: linear-gradient(135deg, #025a8f, #0369a1);
 }
 
 .btn--secondary {
@@ -354,4 +354,111 @@ h3 {
 
 .img-loader__img.is-loaded {
   opacity: 1;
+}
+
+/* ── Thème sombre ── */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: #334155;
+  --primary-soft: #0c4a6e;
+  --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 18px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .page {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(51, 65, 85, 0.9);
+}
+
+[data-theme="dark"] .page__header {
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .card {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .card:hover {
+  border-color: #0369a1;
+}
+
+[data-theme="dark"] .card__image {
+  background:
+    radial-gradient(circle at 25% 20%, rgba(14, 165, 233, 0.1), transparent 28%),
+    linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+  border-color: #334155;
+}
+
+[data-theme="dark"] .btn--secondary {
+  color: #7dd3fc;
+  background: #0c2a3f;
+  border-color: #0369a1;
+}
+
+[data-theme="dark"] .btn--secondary:hover {
+  background: #0c3d5f;
+  border-color: #0284c7;
+}
+
+[data-theme="dark"] .input,
+[data-theme="dark"] .select,
+[data-theme="dark"] .textarea {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .input::placeholder,
+[data-theme="dark"] .textarea::placeholder {
+  color: #64748b;
+}
+
+[data-theme="dark"] .badge {
+  background: linear-gradient(135deg, #0c4a6e, #0c2a3f);
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .panel {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .notice--info {
+  background: #0c1e2e;
+  border-color: #1d4ed8;
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .notice--warning {
+  background: #1c1002;
+  border-color: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .notice--success {
+  background: #042f14;
+  border-color: #14532d;
+  color: #86efac;
+}
+
+[data-theme="dark"] .status-pill--ok {
+  background: #042f14;
+  color: #86efac;
+}
+
+[data-theme="dark"] .status-pill--warning {
+  background: #1c1002;
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .status-pill--danger {
+  background: #2d0000;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .form-label {
+  color: #cbd5e1;
 }

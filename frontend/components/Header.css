@@ -71,7 +71,7 @@
 
 .site-header__link:hover {
   background: #eff6ff;
-  color: #0284c7;
+  color: #0369a1;
   transform: translateY(-1px);
 }
 
@@ -113,7 +113,7 @@
 .site-header__utility:hover {
   border-color: #7dd3fc;
   background: #f0f9ff;
-  color: #0284c7;
+  color: #0369a1;
   transform: translateY(-1px);
 }
 
@@ -124,7 +124,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #0284c7;
+  background: #0369a1;
   color: #ffffff;
   font-size: 0.72rem;
   font-weight: 900;
@@ -188,7 +188,7 @@
 
 .burger-menu__item:hover {
   background: #f0f9ff;
-  color: #0284c7;
+  color: #0369a1;
 }
 
 .burger-menu__item--danger {
@@ -220,6 +220,70 @@
 
 .burger-menu__social-link:hover {
   color: #0284c7;
+}
+
+/* ── Thème sombre ── */
+[data-theme="dark"] .site-header {
+  background: rgba(15, 23, 42, 0.94);
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .site-header__link {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .site-header__link:hover {
+  background: #0c2a3f;
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .site-header__link.is-active {
+  background: #0c2a3f;
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .site-header__utility {
+  border-color: #334155;
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .site-header__utility:hover {
+  border-color: #0284c7;
+  background: #0c2a3f;
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .site-header__burger-menu {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .burger-menu__item {
+  color: #f1f5f9;
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .burger-menu__item:hover {
+  background: #0c2a3f;
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .burger-menu__item--danger {
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .burger-menu__item--danger:hover {
+  background: #2d0000;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .burger-menu__social-link {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .burger-menu__social-link:hover {
+  color: #7dd3fc;
 }
 
 /* ---- Tablet ---- */

@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './styles/global.css';
 import { I18nProvider } from './contexts/I18nContext.jsx';
+import { ThemeProvider } from './contexts/ThemeContext.jsx';
 
 const container = document.getElementById('root');
 
@@ -12,9 +13,11 @@ if (container) {
   root.render(
     <React.StrictMode>
       <HashRouter>
-        <I18nProvider>
-          <App />
-        </I18nProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <App />
+          </I18nProvider>
+        </ThemeProvider>
       </HashRouter>
     </React.StrictMode>
   );

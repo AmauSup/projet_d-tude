@@ -5,6 +5,7 @@ import App from './App.jsx';
 import './styles/global.css';
 import { I18nProvider } from './contexts/I18nContext.jsx';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
+import { ToastProvider } from './contexts/ToastContext.jsx';
 
 const container = document.getElementById('root');
 
@@ -15,7 +16,9 @@ if (container) {
       <HashRouter>
         <ThemeProvider>
           <I18nProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </I18nProvider>
         </ThemeProvider>
       </HashRouter>

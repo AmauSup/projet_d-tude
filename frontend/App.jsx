@@ -162,7 +162,7 @@ function RequireAdmin({ isAuthenticated, isAdmin, children }) {
 }());
 
 export default function App() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const location = useLocation();
   const routerNavigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -187,10 +187,10 @@ export default function App() {
     }
   }, [location.pathname, searchParams, searchState.query, setSearchState]);
 
-  // Chargement initial : catalogue depuis le backend + nettoyage du panier
+  // Chargement initial + rechargement lors d'un changement de langue
   useEffect(() => {
     let mounted = true;
-    storefrontService.getInitialData().then((data) => {
+    storefrontService.getInitialData(locale).then((data) => {
       if (!mounted) return;
       if (data.products.length > 0) {
         setProducts(data.products);
@@ -203,7 +203,7 @@ export default function App() {
     }).catch(() => {});
     return () => { mounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [locale]);
 
   // Restaurer les commandes depuis le backend si l'utilisateur est déjà connecté (refresh page)
   useEffect(() => {

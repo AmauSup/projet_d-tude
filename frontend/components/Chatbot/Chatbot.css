@@ -40,6 +40,11 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #dbeafe;
+  /* Reset <dialog> browser defaults that break fixed-corner positioning */
+  position: static;
+  margin: 0;
+  padding: 0;
+  inset: auto;
 }
 
 .chatbot-header {
@@ -116,6 +121,29 @@
   white-space: nowrap;
   font-size: 0.875rem;
   padding: 8px 14px;
+}
+
+.chatbot-footer {
+  padding: 8px 12px;
+  border-top: 1px solid #dbeafe;
+  text-align: center;
+}
+
+.chatbot-escalate-btn {
+  font-size: 0.82rem;
+  color: #0369a1;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.chatbot-escalate-form {
+  padding: 10px 12px;
+  border-top: 1px solid #dbeafe;
+  display: grid;
+  gap: 8px;
 }
 
 [dir="rtl"] .chatbot-root {

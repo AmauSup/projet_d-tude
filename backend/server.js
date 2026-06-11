@@ -249,7 +249,7 @@ app.post('/api/pg/auth/register', rateLimit(15 * 60 * 1000, 20), async (req, res
       'INSERT INTO email_verification_token (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, verificationToken, verificationExpires],
     );
-    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/verify-email?token=${verificationToken}`;
     mailer.sendEmailVerification(user, verifyLink).catch((e) => console.warn('[mailer verify]', e.message));
     return res.status(201).json({
       success: true,
@@ -362,12 +362,12 @@ app.post('/api/pg/auth/resend-verification', rateLimit(15 * 60 * 1000, 5), async
     if (!process.env.SMTP_HOST) {
       // En dev, auto-vérifier directement sans envoyer d'email
       await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1', [user.id]);
-      const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+      const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/verify-email?token=${verificationToken}`;
       console.info('[DEV] Compte auto-vérifié via resend (SMTP non configuré) :', user.email);
       console.info('[DEV] Lien de vérification :', verifyLink);
       return res.json({ success: true });
     }
-    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/verify-email?token=${verificationToken}`;
     mailer.sendEmailVerification(user, verifyLink).catch((e) => console.warn('[mailer resend-verify]', e.message));
     return res.json({ success: true });
   } catch (err) {
@@ -430,21 +430,26 @@ app.get('/api/pg/translations/:locale', async (req, res) => {
 });
 
 // --- PRODUITS PUBLICS ---
-app.get('/api/pg/products', async (_req, res) => {
+app.get('/api/pg/products', async (req, res) => {
+  const locale = req.query.locale || 'fr';
   try {
     const { rows } = await pool.query(`
       SELECT p.id, p.price, p.stock, p.image, p.category_id, p.created_at, p.updated_at,
              COALESCE(p.priority,0) AS priority, COALESCE(p.featured,0) AS featured,
              p.slug,
-             pt.name, pt.description, pt.characteristics,
+             COALESCE(NULLIF(pt_loc.name,''), pt_fr.name) AS name,
+             COALESCE(NULLIF(pt_loc.description,''), pt_fr.description) AS description,
+             COALESCE(NULLIF(pt_loc.characteristics,''), pt_fr.characteristics) AS characteristics,
              c.name AS category_name, c.slug AS category_slug
       FROM product p
-      LEFT JOIN product_translation pt ON pt.product_id = p.id
-      LEFT JOIN language l ON pt.language_id = l.id AND l.code = 'fr'
+      LEFT JOIN product_translation pt_loc ON pt_loc.product_id = p.id
+        AND pt_loc.language_id = (SELECT id FROM language WHERE code = $1 LIMIT 1)
+      LEFT JOIN product_translation pt_fr ON pt_fr.product_id = p.id
+        AND pt_fr.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
       LEFT JOIN category c ON c.id = p.category_id
       WHERE p.deleted_at IS NULL
       ORDER BY p.created_at DESC
-    `);
+    `, [locale]);
     return res.json({ success: true, products: rows });
   } catch (err) {
     console.error('[products]', err.message);
@@ -453,23 +458,38 @@ app.get('/api/pg/products', async (_req, res) => {
 });
 
 // --- STOREFRONT ---
-app.get('/api/pg/storefront', async (_req, res) => {
+app.get('/api/pg/storefront', async (req, res) => {
+  const locale = req.query.locale || 'fr';
   try {
     const [productsRes, categoriesRes] = await Promise.all([
       pool.query(`
         SELECT p.id, p.price, p.stock, p.image, p.category_id, p.created_at,
                COALESCE(p.priority,0) AS priority, COALESCE(p.featured,0) AS featured,
                p.slug,
-               pt.name, pt.description, pt.characteristics,
+               COALESCE(NULLIF(pt_loc.name,''), pt_fr.name) AS name,
+               COALESCE(NULLIF(pt_loc.description,''), pt_fr.description) AS description,
+               COALESCE(NULLIF(pt_loc.characteristics,''), pt_fr.characteristics) AS characteristics,
                c.slug AS category_slug
         FROM product p
-        LEFT JOIN product_translation pt ON pt.product_id = p.id
-          AND pt.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
+        LEFT JOIN product_translation pt_loc ON pt_loc.product_id = p.id
+          AND pt_loc.language_id = (SELECT id FROM language WHERE code = $1 LIMIT 1)
+        LEFT JOIN product_translation pt_fr ON pt_fr.product_id = p.id
+          AND pt_fr.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
         LEFT JOIN category c ON c.id = p.category_id
         WHERE p.deleted_at IS NULL
         ORDER BY p.created_at DESC
-      `),
-      pool.query('SELECT * FROM category ORDER BY order_index ASC, id ASC'),
+      `, [locale]),
+      pool.query(`
+        SELECT c.id, c.slug, c.order_index, c.image_url,
+          COALESCE(NULLIF(ct_loc.name,''), NULLIF(ct_fr.name,''), c.name, '') AS name,
+          COALESCE(NULLIF(ct_loc.description,''), NULLIF(ct_fr.description,''), '') AS description
+        FROM category c
+        LEFT JOIN category_translation ct_loc ON ct_loc.category_id = c.id
+          AND ct_loc.language_id = (SELECT id FROM language WHERE code = $1 LIMIT 1)
+        LEFT JOIN category_translation ct_fr ON ct_fr.category_id = c.id
+          AND ct_fr.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
+        ORDER BY c.order_index ASC, c.id ASC
+      `, [locale]),
     ]);
 
     let homeContent = { fixedMessage: 'Bienvenue sur Althea Systems.', carousel: [] };
@@ -1338,7 +1358,7 @@ app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (r
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
     }
   } catch (err) {
     console.error('[forgot-password]', err.message);
@@ -1360,7 +1380,7 @@ app.post('/api/pg/auth/request-reset-password', rateLimit(15 * 60 * 1000, 10), a
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
     }
   } catch (err) {
     console.error('[request-reset-password]', err.message);

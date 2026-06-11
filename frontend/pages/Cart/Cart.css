@@ -94,6 +94,38 @@
   font-size: 0.9rem;
 }
 
+[data-theme="dark"] .cart-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .cart-item p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .cart-summary {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .cart-summary h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .cart-summary p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .cart-summary hr {
+  border-top-color: #334155;
+}
+
+[data-theme="dark"] .cart-login-hint {
+  background: #0c2340;
+  border-color: #1e4a72;
+  color: #93c5fd;
+}
+
 @media (max-width: 900px) {
   .cart-layout {
     grid-template-columns: 1fr;

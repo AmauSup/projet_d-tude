@@ -77,9 +77,9 @@ function normalizeCategory(c) {
 }
 
 export const storefrontService = {
-  async getInitialData() {
+  async getInitialData(locale = 'fr') {
     try {
-      const data = await apiClient.get('/pg/storefront');
+      const data = await apiClient.get(`/pg/storefront?locale=${encodeURIComponent(locale)}`);
       return {
         products: (data.products || []).map(normalizeProduct),
         categories: (data.categories || []).map(normalizeCategory),
@@ -102,9 +102,9 @@ export const storefrontService = {
     }
   },
 
-  async getProducts() {
+  async getProducts(locale = 'fr') {
     try {
-      const data = await apiClient.get('/pg/products');
+      const data = await apiClient.get(`/pg/products?locale=${encodeURIComponent(locale)}`);
       return (data.products || []).map(normalizeProduct);
     } catch (pgErr) {
       console.warn('[products] PG indisponible, fallback db.json:', pgErr.message);

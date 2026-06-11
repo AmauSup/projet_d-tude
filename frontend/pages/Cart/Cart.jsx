@@ -1,29 +1,45 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import './Cart.css';
 import { formatPrice } from '../../utils/storefront.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
+import ImageWithLoader from '../../components/common/ImageWithLoader.jsx';
+
+Cart.propTypes = {
+  items: PropTypes.array,
+  summary: PropTypes.shape({
+    subtotalCents: PropTypes.number,
+    taxCents: PropTypes.number,
+    promotionCents: PropTypes.number,
+    totalCents: PropTypes.number,
+    unavailableCount: PropTypes.number,
+  }),
+  isAuthenticated: PropTypes.bool,
+  onUpdateQuantity: PropTypes.func.isRequired,
+  onRemoveItem: PropTypes.func.isRequired,
+  onNavigate: PropTypes.func.isRequired,
+};
 
 export default function Cart({ items = [], summary, isAuthenticated, onUpdateQuantity, onRemoveItem, onNavigate }) {
+	const { t } = useI18n();
+
 	return (
 		<section className="page cart-page">
 			<header className="page__header">
-				<h1 className="page__title">Mon panier</h1>
-				<p className="page__subtitle">Accessible invité ou connecté. Vérifiez quantités, disponibilité et total TTC.</p>
+				<h1 className="page__title">{t('cart.title')}</h1>
+				<p className="page__subtitle">{t('cart.subtitle')}</p>
 			</header>
 
 			<div className="cart-layout">
 				<div className="cart-list">
 					{items.map((item) => (
 						<article className="cart-item" key={item.productId}>
-							{item.product.image ? (
-							<img className="cart-item__img" src={item.product.image} alt={item.product.name} />
-						) : (
-							<div className="cart-item__img" />
-						)}
+							<ImageWithLoader className="cart-item__img" src={item.product.image} alt={item.product.name} />
 							<div>
 								<h3>{item.product.name}</h3>
-								<p>Prix unitaire : {formatPrice(item.product.priceCents)}</p>
+								<p>{t('cart.unitPrice')} {formatPrice(item.product.priceCents)}</p>
 								<p>
-									Statut : {item.isUnavailable ? 'Indisponible' : `${item.product.availableStock} en stock`} • Total : {formatPrice(item.lineTotalCents)}
+									{t('cart.status')} {item.isUnavailable ? t('cart.unavailable') : `${item.product.availableStock} ${t('cart.inStock')}`}{' '}• {t('cart.total')} {formatPrice(item.lineTotalCents)}
 								</p>
 								<div className="cart-item__actions">
 									<input
@@ -34,38 +50,40 @@ export default function Cart({ items = [], summary, isAuthenticated, onUpdateQua
 										onChange={(event) => onUpdateQuantity(item.productId, Number(event.target.value))}
 									/>
 									<button className="btn btn--secondary" type="button" onClick={() => onRemoveItem(item.productId)}>
-										Supprimer
+										{t('cart.remove')}
 									</button>
 								</div>
 							</div>
 							<strong>{formatPrice(item.lineTotalCents)}</strong>
 						</article>
 					))}
-					{items.length === 0 ? <div className="notice notice--warning">Votre panier est vide.</div> : null}
+					{items.length === 0 ? <div className="notice notice--warning">{t('cart.empty')}</div> : null}
 				</div>
 
 				<aside className="cart-summary">
-					<h3>Total commande</h3>
-					<p>Sous-total : {formatPrice(summary.subtotalCents)}</p>
-					<p>Taxes : {formatPrice(summary.taxCents)}</p>
-					<p>Promotion : -{formatPrice(summary.promotionCents)}</p>
+					<h3>{t('cart.orderTotal')}</h3>
+					<p>{t('cart.subtotal')} {formatPrice(summary.subtotalCents)}</p>
+					<p>{t('cart.tax')} {formatPrice(summary.taxCents)}</p>
+					<p>{t('cart.promo')} -{formatPrice(summary.promotionCents)}</p>
 					<hr />
-					<p><strong>Total TTC : {formatPrice(summary.totalCents)}</strong></p>
+					<p><strong>{t('cart.totalTax')} {formatPrice(summary.totalCents)}</strong></p>
 					<button className="btn btn--primary" type="button" disabled={items.length === 0 || summary.unavailableCount > 0} onClick={() => onNavigate('/checkout')}>
-						Passer à la caisse
+						{t('cart.checkout')}
 					</button>
 					<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/catalog')}>
-						Continuer mes achats
+						{t('cart.continueShopping')}
 					</button>
 				</aside>
 			</div>
 
 			<div className="cart-login-hint">
-				<strong>Conseil :</strong> {isAuthenticated ? 'Votre panier est rattaché à votre compte.' : 'Connectez-vous ou créez un compte pour sauvegarder votre panier avant paiement.'}
+				<strong>{t('cart.tip')}</strong>{' '}
+				{isAuthenticated ? t('cart.accountHint') : t('cart.guestHint')}
 			</div>
 			{summary.unavailableCount > 0 ? (
 				<div className="cart-login-hint">
-					<strong>Info stock :</strong> Les produits indisponibles doivent être retirés ou remplacés avant de continuer.
+					<strong>{t('cart.stockInfo')}</strong>{' '}
+					{t('cart.stockHint')}
 				</div>
 			) : null}
 		</section>

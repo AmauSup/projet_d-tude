@@ -245,7 +245,7 @@ export default function AccountSettings({ user = {}, onSave, onNavigate }) {
         </article>
       </div>
 
-      <div className="page-actions">
+      <div className="page-actions" style={{ marginTop: 32 }}>
         <button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour au compte</button>
       </div>
     </section>

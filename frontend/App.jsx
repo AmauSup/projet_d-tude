@@ -61,6 +61,7 @@ import { authService } from './services/authService.js';
 import { storefrontService } from './services/storefrontService.js';
 import { checkoutService } from './services/checkoutService.js';
 import { apiClient, persistAuthToken } from './services/apiClient.js';
+import { adminService } from './services/adminService.js';
 import { useI18n } from './contexts/I18nContext.jsx';
 import Chatbot from './components/Chatbot/Chatbot.jsx';
 
@@ -525,37 +526,41 @@ export default function App() {
   };
 
   const handleToggleProductPriority = (productId) => {
-    setProducts((previous) => {
-      const maxPriority = Math.max(0, ...previous.map((product) => product.priorityRank || 0));
-
-      return previous.map((product) =>
-        product.id === productId
-          ? { ...product, priorityRank: product.priorityRank > 0 ? 0 : maxPriority + 1 }
-          : product,
-      );
-    });
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+    const maxPriority = Math.max(0, ...products.map((p) => p.priorityRank || 0));
+    const newPriority = target.priorityRank > 0 ? 0 : maxPriority + 1;
+    adminService.updateProduct(productId, { priority: newPriority }).catch(console.error);
+    setProducts((previous) =>
+      previous.map((p) =>
+        p.id === productId ? { ...p, priorityRank: newPriority } : p,
+      ),
+    );
   };
 
   const handleToggleProductAvailability = (productId) => {
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+    const newStock = target.availableStock > 0 ? 0 : 10;
+    adminService.updateProduct(productId, { stock: newStock }).catch(console.error);
     setProducts((previous) =>
-      previous.map((product) =>
-        product.id === productId
-          ? { ...product, availableStock: product.availableStock > 0 ? 0 : 10 }
-          : product,
+      previous.map((p) =>
+        p.id === productId ? { ...p, availableStock: newStock } : p,
       ),
     );
   };
 
   const handleToggleFeatured = (productId) => {
-    setProducts((previous) => {
-      const maxFeatured = Math.max(0, ...previous.map((product) => product.featuredRank || 0));
-
-      return previous.map((product) =>
-        product.id === productId
-          ? { ...product, featuredRank: product.featuredRank > 0 ? 0 : maxFeatured + 1 }
-          : product,
-      );
-    });
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+    const maxFeatured = Math.max(0, ...products.map((p) => p.featuredRank || 0));
+    const newFeatured = target.featuredRank > 0 ? 0 : maxFeatured + 1;
+    adminService.updateProduct(productId, { featured: newFeatured }).catch(console.error);
+    setProducts((previous) =>
+      previous.map((p) =>
+        p.id === productId ? { ...p, featuredRank: newFeatured } : p,
+      ),
+    );
   };
 
   const handleDeleteProduct = (productId) => {

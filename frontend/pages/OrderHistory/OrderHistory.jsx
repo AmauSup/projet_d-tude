@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import './OrderHistory.css';
 import { formatPrice } from '../../utils/storefront.js';
 
@@ -23,6 +24,27 @@ function downloadInvoice(orderId) {
 		})
 		.catch((e) => alert(`Impossible de télécharger la facture : ${e.message}`));
 }
+
+OrderHistory.propTypes = {
+  orders: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string,
+    createdAt: PropTypes.string,
+    status: PropTypes.string,
+    totalCents: PropTypes.number,
+    items: PropTypes.arrayOf(PropTypes.shape({
+      productId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      quantity: PropTypes.number,
+    })),
+    billingAddress: PropTypes.object,
+    paymentSummary: PropTypes.string,
+  })),
+  products: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    name: PropTypes.string,
+    priceCents: PropTypes.number,
+  })),
+  onNavigate: PropTypes.func.isRequired,
+};
 
 export default function OrderHistory({ orders = [], products = [], onNavigate }) {
 	const [expanded, setExpanded] = useState(null);
@@ -182,7 +204,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate })
 				</div>
 			))}
 
-			<div className="page-actions">
+			<div className="page-actions" style={{ marginTop: 32 }}>
 				<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour à mon compte</button>
 			</div>
 		</section>

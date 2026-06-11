@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import './Category.css';
 import { formatPrice } from '../../utils/storefront.js';
 import Pagination from '../../components/Pagination/Pagination.jsx';
+import ImageWithLoader from '../../components/common/ImageWithLoader.jsx';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 const PAGE_SIZE = 12;
 
@@ -12,6 +15,7 @@ export default function Category({
   onSelectCategory,
   onOpenProduct,
 }) {
+  const { t } = useI18n();
   const [availableOnly, setAvailableOnly] = useState(false);
   const [priorityOnly, setPriorityOnly] = useState(false);
   const [page, setPage] = useState(1);
@@ -32,19 +36,21 @@ export default function Category({
   return (
     <section className="page category-page">
       <header className="page__header">
-        <h1 className="page__title">Catalogue{activeCategory ? ` — ${activeCategory.name}` : ' — Tous les produits'}</h1>
-        <p className="page__subtitle">
-          Tri métier : produits prioritaires puis disponibles, les ruptures de stock restant visibles en bas.
-        </p>
+        <h1 className="page__title">
+          {activeCategory
+            ? `${t('category.title')} — ${activeCategory.name}`
+            : t('category.titleAll')}
+        </h1>
+        <p className="page__subtitle">{t('category.subtitle')}</p>
       </header>
 
       <div className="category-hero">
         <div className="category-hero__image-wrap">
-          {activeCategory?.imageUrl ? (
-            <img className="category-hero__image" src={activeCategory.imageUrl} alt={activeCategory.name} />
-          ) : (
-            <div className="category-hero__image category-hero__image--placeholder" />
-          )}
+          <ImageWithLoader
+            className={`category-hero__image${activeCategory?.imageUrl ? '' : ' category-hero__image--placeholder'}`}
+            src={activeCategory?.imageUrl}
+            alt={activeCategory?.name || ''}
+          />
           <div className="category-hero__overlay">
             <span className="badge">{activeCategory?.heroLabel || activeCategory?.name}</span>
             <h2>{activeCategory?.name}</h2>
@@ -57,14 +63,14 @@ export default function Category({
 
       <div className="category-layout">
         <aside className="category-filters">
-          <h3>Navigation & filtres</h3>
+          <h3>{t('category.navAndFilters')}</h3>
 
           <select
             className="select"
             value={activeCategory?.slug ?? ''}
             onChange={(event) => onSelectCategory(event.target.value)}
           >
-            <option value="">Tous les produits</option>
+            <option value="">{t('category.allProducts')}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.slug}>
                 {category.name}
@@ -77,8 +83,8 @@ export default function Category({
               type="checkbox"
               checked={availableOnly}
               onChange={(event) => setAvailableOnly(event.target.checked)}
-            />
-            Disponible uniquement
+            />{' '}
+            {t('category.availableOnly')}
           </label>
 
           <label>
@@ -86,11 +92,11 @@ export default function Category({
               type="checkbox"
               checked={priorityOnly}
               onChange={(event) => setPriorityOnly(event.target.checked)}
-            />
-            Prioritaire back-office
+            />{' '}
+            {t('category.priorityOnly')}
           </label>
 
-          <p className="helper-text">{filteredProducts.length} produit(s)</p>
+          <p className="helper-text">{filteredProducts.length} {t('category.productCount')}</p>
         </aside>
 
         <div className="stack" style={{ flex: 1 }}>
@@ -100,20 +106,18 @@ export default function Category({
                 className={`card category-card ${product.availableStock <= 0 ? 'is-unavailable' : ''}`}
                 key={product.id}
               >
-                {product.image ? (
-                  <img className="card__image" src={product.image} alt={product.name} />
-                ) : (
-                  <div className="card__image" />
-                )}
+                <ImageWithLoader className="card__image" src={product.image} alt={product.name} />
                 <h3>{product.name}</h3>
                 <p>{product.shortDescription}</p>
 
                 <div className="inline-actions">
                   <span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
-                    {product.availableStock > 0 ? `${product.availableStock} en stock` : 'En rupture de stock'}
+                    {product.availableStock > 0
+                      ? `${product.availableStock} ${t('category.inStock')}`
+                      : t('category.outOfStock')}
                   </span>
                   {product.priorityRank > 0 ? (
-                    <span className="status-pill status-pill--warning">Prioritaire #{product.priorityRank}</span>
+                    <span className="status-pill status-pill--warning">{t('category.priorityLabel')}{product.priorityRank}</span>
                   ) : null}
                 </div>
 
@@ -124,12 +128,12 @@ export default function Category({
                   type="button"
                   onClick={() => onOpenProduct(product.slug)}
                 >
-                  Voir le produit
+                  {t('category.viewProduct')}
                 </button>
               </article>
             ))}
             {paginated.length === 0 && (
-              <div className="notice notice--info">Aucun produit ne correspond aux filtres sélectionnés.</div>
+              <div className="notice notice--info">{t('category.noResults')}</div>
             )}
           </div>
 
@@ -139,3 +143,22 @@ export default function Category({
     </section>
   );
 }
+
+Category.propTypes = {
+  categories: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.number,
+    slug: PropTypes.string,
+    name: PropTypes.string,
+  })),
+  activeCategory: PropTypes.shape({
+    id: PropTypes.number,
+    slug: PropTypes.string,
+    name: PropTypes.string,
+    imageUrl: PropTypes.string,
+    description: PropTypes.string,
+    heroLabel: PropTypes.string,
+  }),
+  products: PropTypes.array,
+  onSelectCategory: PropTypes.func.isRequired,
+  onOpenProduct: PropTypes.func.isRequired,
+};

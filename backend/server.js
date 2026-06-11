@@ -103,6 +103,18 @@ pool.query(`
   CREATE INDEX IF NOT EXISTS idx_payment_method_user ON payment_method(user_id);
 `).catch((e) => console.warn('[DB migration payment_method]', e.message));
 
+// Drop accidental NOT NULL without DEFAULT on payment_method.name if present
+pool.query(`
+  DO $$ BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'payment_method' AND column_name = 'name'
+    ) THEN
+      ALTER TABLE payment_method ALTER COLUMN name DROP NOT NULL;
+    END IF;
+  END $$;
+`).catch((e) => console.warn('[DB migration payment_method.name]', e.message));
+
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',

@@ -151,7 +151,7 @@ export default function Header({
               {isAuthenticated ? (
                 <>
                   <button type="button" className="site-header__utility" onClick={() => go('/account')}>
-                    Mon compte
+                    {t('nav.account')}
                   </button>
                   <button type="button" className="site-header__link" onClick={onLogout}>
                     {t('nav.logout')}

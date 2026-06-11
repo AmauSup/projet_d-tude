@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import './Product.css';
 import { formatPrice } from '../../utils/storefront.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
+import ImageWithLoader from '../../components/common/ImageWithLoader.jsx';
 
 function ImageCarousel({ images, name }) {
   const [index, setIndex] = useState(0);
@@ -16,7 +18,7 @@ function ImageCarousel({ images, name }) {
   return (
     <div className="product-gallery">
       <div className="product-carousel">
-        <img
+        <ImageWithLoader
           className="product-carousel__main"
           src={images[index]}
           alt={`${name} — vue ${index + 1}`}
@@ -35,7 +37,7 @@ function ImageCarousel({ images, name }) {
                   aria-label={`Vue ${i + 1}`}
                   aria-pressed={i === index}
                 >
-                  <img src={src} alt="" aria-hidden="true" />
+                  <ImageWithLoader src={src} alt="" style={{ width: '100%', height: '100%' }} />
                 </button>
               ))}
             </div>
@@ -77,9 +79,9 @@ export default function Product({
   onBuyNow,
   onOpenProduct,
 }) {
+  const { t } = useI18n();
   const isAvailable = useMemo(() => product?.availableStock > 0, [product]);
 
-  // Construit la liste des images : tableau `images` en priorité, sinon `image` seul
   const images = useMemo(() => {
     if (!product) return [];
     if (Array.isArray(product.images) && product.images.length > 0) return product.images;
@@ -90,7 +92,7 @@ export default function Product({
   if (!product) {
     return (
       <section className="page product-page">
-        <p>Aucun produit sélectionné.</p>
+        <p>{t('product.notSelected')}</p>
       </section>
     );
   }
@@ -101,22 +103,22 @@ export default function Product({
         <ImageCarousel images={images} name={product.name} />
 
         <div className="product-info">
-          <span className="badge">Dispositif médical</span>
+          <span className="badge">{t('product.badge')}</span>
           <h1 className="page__title">{product.name}</h1>
           <p className="product-description">{product.description}</p>
           <p className="product-price">{formatPrice(product.priceCents)}</p>
 
           <p>
-            Disponibilité :{' '}
+            {t('product.availability')}{' '}
             <strong>
               {isAvailable
-                ? `${product.availableStock} unité(s) disponible(s)`
-                : 'En rupture de stock'}
+                ? `${product.availableStock} ${t('product.available')}`
+                : t('product.outOfStock')}
             </strong>
           </p>
 
           <article className="panel">
-            <h3>Caractéristiques techniques</h3>
+            <h3>{t('product.technicalFeatures')}</h3>
             <ul className="product-features">
               {(product.technicalFeatures || []).map((feature) => (
                 <li key={feature}>{feature}</li>
@@ -131,7 +133,7 @@ export default function Product({
               disabled={!isAvailable}
               onClick={() => onAddToCart(product.id, 1)}
             >
-              {isAvailable ? 'Ajouter au panier' : 'En rupture de stock'}
+              {isAvailable ? t('product.addToCart') : t('product.outOfStock')}
             </button>
 
             <button
@@ -140,22 +142,18 @@ export default function Product({
               disabled={!isAvailable}
               onClick={() => onBuyNow(product.id)}
             >
-              Acheter maintenant
+              {t('product.buyNow')}
             </button>
           </div>
         </div>
       </div>
 
       <section className="home-section">
-        <h2>Produits similaires</h2>
+        <h2>{t('product.relatedProducts')}</h2>
         <div className="card-grid">
           {relatedProducts.map((relatedProduct) => (
             <article className="card" key={relatedProduct.id}>
-              {relatedProduct.image ? (
-                <img className="card__image" src={relatedProduct.image} alt={relatedProduct.name} />
-              ) : (
-                <div className="card__image" />
-              )}
+              <ImageWithLoader className="card__image" src={relatedProduct.image} alt={relatedProduct.name} />
               <h3>{relatedProduct.name}</h3>
               <p>{relatedProduct.shortDescription}</p>
               <strong>{formatPrice(relatedProduct.priceCents)}</strong>
@@ -164,7 +162,7 @@ export default function Product({
                 type="button"
                 onClick={() => onOpenProduct(relatedProduct.slug)}
               >
-                Voir la fiche
+                {t('product.viewProduct')}
               </button>
             </article>
           ))}

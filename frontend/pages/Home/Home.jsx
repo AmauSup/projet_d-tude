@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import './Home.css';
 import { formatPrice } from '../../utils/storefront.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
+import ImageWithLoader from '../../components/common/ImageWithLoader.jsx';
 
 const slideShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -25,7 +27,6 @@ function Carousel({ slides, onOpenCategory }) {
   const prev = useCallback(() => setCurrent((c) => (c === 0 ? slides.length - 1 : c - 1)), [slides.length]);
   const next = useCallback(() => setCurrent((c) => (c === slides.length - 1 ? 0 : c + 1)), [slides.length]);
 
-  // Swipe tactile
   const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null) return;
@@ -35,7 +36,6 @@ function Carousel({ slides, onOpenCategory }) {
     touchStartX.current = null;
   };
 
-  // Auto-avance toutes les 5 secondes
   useEffect(() => {
     if (slides.length <= 1) return;
     const id = setInterval(next, 5000);
@@ -73,22 +73,8 @@ function Carousel({ slides, onOpenCategory }) {
 
       {slides.length > 1 && (
         <>
-          <button
-            type="button"
-            className="carousel-arrow carousel-arrow--prev"
-            onClick={prev}
-            aria-label="Diapositive précédente"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="carousel-arrow carousel-arrow--next"
-            onClick={next}
-            aria-label="Diapositive suivante"
-          >
-            ›
-          </button>
+          <button type="button" className="carousel-arrow carousel-arrow--prev" onClick={prev} aria-label="Diapositive précédente">‹</button>
+          <button type="button" className="carousel-arrow carousel-arrow--next" onClick={next} aria-label="Diapositive suivante">›</button>
           <div className="carousel-dots" role="tablist" aria-label="Diapositives">
             {slides.map((s, i) => (
               <button
@@ -126,13 +112,13 @@ export default function Home({
   onOpenCategory,
   onOpenProduct,
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="page home-page">
       <header className="page__header">
-        <h1 className="page__title">Bienvenue sur Althea Medical</h1>
-        <p className="page__subtitle">
-          Équipements médicaux certifiés pour cabinets, cliniques et structures hospitalières.
-        </p>
+        <h1 className="page__title">{t('home.title')}</h1>
+        <p className="page__subtitle">{t('home.subtitle')}</p>
       </header>
 
       <Carousel slides={homeContent.carousel} onOpenCategory={onOpenCategory} />
@@ -142,15 +128,11 @@ export default function Home({
       </div>
 
       <section className="home-section">
-        <h2>Catégories populaires</h2>
+        <h2>{t('home.popularCategories')}</h2>
         <div className="card-grid">
           {categories.slice(0, 6).map((category) => (
             <article className="card home-card" key={category.id}>
-              {category.imageUrl ? (
-                <img className="card__image" src={category.imageUrl} alt={category.name} />
-              ) : (
-                <div className="card__image" />
-              )}
+              <ImageWithLoader className="card__image" src={category.imageUrl} alt={category.name} />
               <h3>{category.name}</h3>
               <p>{category.description}</p>
               <button
@@ -158,7 +140,7 @@ export default function Home({
                 type="button"
                 onClick={() => onOpenCategory(category.slug)}
               >
-                Voir la catégorie
+                {t('home.viewCategory')}
               </button>
             </article>
           ))}
@@ -166,30 +148,24 @@ export default function Home({
       </section>
 
       <section className="home-section">
-        <h2>Top produits du moment</h2>
+        <h2>{t('home.topProducts')}</h2>
         <div className="card-grid">
           {featuredProducts.slice(0, 6).map((product) => (
             <article className="card home-card" key={product.id}>
-              {product.image ? (
-                <img className="card__image" src={product.image} alt={product.name} />
-              ) : (
-                <div className="card__image" />
-              )}
+              <ImageWithLoader className="card__image" src={product.image} alt={product.name} />
               <h3>{product.name}</h3>
               <p>{product.shortDescription}</p>
               <p className="home-price">{formatPrice(product.priceCents)}</p>
               <div className="inline-actions">
-                <span
-                  className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}
-                >
-                  {product.availableStock > 0 ? 'En stock' : 'Rupture de stock'}
+                <span className={`status-pill ${product.availableStock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
+                  {product.availableStock > 0 ? t('home.inStock') : t('home.outOfStock')}
                 </span>
                 <button
                   className="btn btn--primary"
                   type="button"
                   onClick={() => onOpenProduct(product.slug)}
                 >
-                  Voir la fiche
+                  {t('home.viewProduct')}
                 </button>
               </div>
             </article>

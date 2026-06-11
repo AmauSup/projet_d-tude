@@ -71,8 +71,20 @@
 }
 
 @media (max-width: 768px) {
-  .site-footer {
-    display: none;
+  .site-footer__container {
+    padding: 14px 16px;
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+
+  .site-footer__links {
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+
+  .site-footer__socials {
+    gap: 10px;
+    font-size: 0.8rem;
   }
 }
 

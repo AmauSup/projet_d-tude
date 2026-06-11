@@ -71,6 +71,7 @@ export default function Header({
     { label: t('nav.register'), path: '/register' },
     { label: t('nav.terms'), path: '/terms' },
     { label: t('nav.legal'), path: '/legal' },
+    { label: 'RGPD', path: '/rgpd' },
     { label: t('nav.contact'), path: '/contact' },
     { label: t('nav.about'), path: '/about' },
   ];
@@ -80,6 +81,7 @@ export default function Header({
     { label: t('nav.orders'), path: '/orders' },
     { label: t('nav.terms'), path: '/terms' },
     { label: t('nav.legal'), path: '/legal' },
+    { label: 'RGPD', path: '/rgpd' },
     { label: t('nav.contact'), path: '/contact' },
     { label: t('nav.about'), path: '/about' },
   ];

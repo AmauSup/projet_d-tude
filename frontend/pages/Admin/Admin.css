@@ -29,4 +29,8 @@
   .admin-page .metric-grid {
     grid-template-columns: 1fr;
   }
+
+  .admin-page .metric-card__value {
+    font-size: 1.4rem;
+  }
 }

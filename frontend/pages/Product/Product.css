@@ -118,6 +118,12 @@
   border-color: #334155;
 }
 
+/* Related products: contain keeps full device visible without cropping */
+.product-related .img-loader__img {
+  object-fit: contain;
+  padding: 8px;
+}
+
 @media (max-width: 900px) {
   .product-layout {
     grid-template-columns: 1fr;

@@ -148,7 +148,7 @@ export default function Product({
         </div>
       </div>
 
-      <section className="home-section">
+      <section className="home-section product-related">
         <h2>{t('product.relatedProducts')}</h2>
         <div className="card-grid">
           {relatedProducts.map((relatedProduct) => (

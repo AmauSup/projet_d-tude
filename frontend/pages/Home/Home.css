@@ -165,7 +165,7 @@
 
   .home-slide--single {
     flex-direction: column;
-    padding: 24px 48px 40px;
+    padding: 24px 20px 32px;
     min-height: unset;
     gap: 16px;
   }

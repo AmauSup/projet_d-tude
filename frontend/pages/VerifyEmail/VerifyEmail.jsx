@@ -53,13 +53,10 @@ export default function VerifyEmail({ onVerified, onNavigate }) {
   if (status === 'success') {
     return (
       <section className="page auth-page">
-        <header className="page__header">
-          <h1 className="page__title">E-mail confirmé !</h1>
-          <p className="page__subtitle">Votre compte est maintenant actif. Vous êtes connecté.</p>
-        </header>
-        <output className="notice notice--success">
-          Votre adresse e-mail a été confirmée avec succès. Bienvenue sur Althea Systems !
-        </output>
+        <div className="notice notice--success" style={{ marginBottom: 24 }}>
+          <strong style={{ display: 'block', fontSize: '1.1rem', marginBottom: 6 }}>E-mail confirmé !</strong>
+          Votre adresse e-mail a été vérifiée avec succès. Votre compte est actif et vous êtes connecté. Bienvenue sur Althea Systems !
+        </div>
         <div className="page-actions">
           <button className="btn btn--primary" type="button" onClick={() => onNavigate('/account')}>
             Accéder à mon compte

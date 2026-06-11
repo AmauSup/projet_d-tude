@@ -33,13 +33,13 @@
 .chatbot-panel {
   width: 340px;
   max-width: calc(100vw - 48px);
-  background: #fff;
+  background: #0f172a;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #dbeafe;
+  border: 1px solid #1e3a5f;
   /* Reset <dialog> browser defaults that break fixed-corner positioning */
   position: static;
   margin: 0;
@@ -81,6 +81,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: #0f172a;
 }
 
 .chatbot-msg {
@@ -92,14 +93,14 @@
 }
 
 .chatbot-msg--bot {
-  background: var(--primary-soft, #e0f2fe);
-  color: #0f172a;
+  background: #1e3a5f;
+  color: #f1f5f9;
   border-bottom-left-radius: 4px;
   align-self: flex-start;
 }
 
 .chatbot-msg--user {
-  background: linear-gradient(135deg, #0369a1, var(--primary-dark, #0284c7));
+  background: #1d4ed8;
   color: #fff;
   border-bottom-right-radius: 4px;
   align-self: flex-end;
@@ -109,12 +110,20 @@
   display: flex;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid #dbeafe;
+  border-top: 1px solid #1e3a5f;
+  background: #0f172a;
 }
 
 .chatbot-input {
   flex: 1;
   font-size: 0.875rem;
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.chatbot-input::placeholder {
+  color: #64748b;
 }
 
 .chatbot-send {
@@ -125,13 +134,14 @@
 
 .chatbot-footer {
   padding: 8px 12px;
-  border-top: 1px solid #dbeafe;
+  border-top: 1px solid #1e3a5f;
   text-align: center;
+  background: #0f172a;
 }
 
 .chatbot-escalate-btn {
   font-size: 0.82rem;
-  color: #0369a1;
+  color: #7dd3fc;
   padding: 0;
   background: none;
   border: none;
@@ -141,9 +151,20 @@
 
 .chatbot-escalate-form {
   padding: 10px 12px;
-  border-top: 1px solid #dbeafe;
+  border-top: 1px solid #1e3a5f;
+  background: #0f172a;
   display: grid;
   gap: 8px;
+}
+
+.chatbot-escalate-form .input {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.chatbot-escalate-form .input::placeholder {
+  color: #64748b;
 }
 
 [dir="rtl"] .chatbot-root {

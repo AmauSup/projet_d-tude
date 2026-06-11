@@ -174,6 +174,12 @@ pool.query(`
     WHERE category_translation.name IS NULL OR category_translation.name = ''
 `).catch((e) => console.warn('[DB seed category translations]', e.message));
 
+// Migration : ajout des colonnes badge et cta_label sur carousel
+pool.query(`
+  ALTER TABLE carousel ADD COLUMN IF NOT EXISTS badge     VARCHAR(100) DEFAULT '';
+  ALTER TABLE carousel ADD COLUMN IF NOT EXISTS cta_label VARCHAR(150) DEFAULT 'Voir la catégorie';
+`).catch((e) => console.warn('[DB migration carousel columns]', e.message));
+
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
@@ -1334,11 +1340,11 @@ app.put('/api/pg/admin/homepage', authenticateToken, async (req, res) => {
 
 app.post('/api/pg/admin/carousel', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
-  const { title, subtitle, image_url, link_url, order_index } = req.body;
+  const { title, subtitle, image_url, link_url, order_index, badge, cta_label } = req.body;
   try {
     const { rows } = await pool.query(
-      'INSERT INTO carousel (title, subtitle, image_url, link_url, order_index) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0],
+      'INSERT INTO carousel (title, subtitle, image_url, link_url, order_index, badge, cta_label) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0, badge || '', cta_label || 'Voir la catégorie'],
     );
     return res.status(201).json({ success: true, slide: rows[0] });
   } catch (err) {
@@ -1349,11 +1355,11 @@ app.post('/api/pg/admin/carousel', authenticateToken, async (req, res) => {
 
 app.put('/api/pg/admin/carousel/:id', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
-  const { title, subtitle, image_url, link_url, order_index } = req.body;
+  const { title, subtitle, image_url, link_url, order_index, badge, cta_label } = req.body;
   try {
     await pool.query(
-      'UPDATE carousel SET title=$1, subtitle=$2, image_url=$3, link_url=$4, order_index=$5 WHERE id=$6',
-      [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0, req.params.id],
+      'UPDATE carousel SET title=$1, subtitle=$2, image_url=$3, link_url=$4, order_index=$5, badge=$6, cta_label=$7 WHERE id=$8',
+      [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0, badge || '', cta_label || 'Voir la catégorie', req.params.id],
     );
     return res.json({ success: true });
   } catch (err) {

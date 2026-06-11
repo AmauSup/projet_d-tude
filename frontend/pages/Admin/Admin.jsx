@@ -22,10 +22,10 @@ export default function Admin({
 	products = [],
 	orders = [],
 	onUpdateHomeMessage,
-	onMoveCarouselSlide,
 	onToggleProductPriority,
 	onToggleProductAvailability,
 	onToggleFeatured,
+	onSetProductFeaturedRank,
 	onSetCategoryOrder,
 	onOpenProduct,
 	onUpdateCarousel,
@@ -61,6 +61,8 @@ export default function Admin({
 		image_url: slide.imageUrl || '',
 		link_url: slide.categorySlug || '',
 		order_index: orderIndex,
+		badge: slide.badge || '',
+		cta_label: slide.ctaLabel || 'Voir la catégorie',
 	});
 
 	const isBackendId = (id) => /^\d+$/.test(String(id));
@@ -130,6 +132,31 @@ export default function Admin({
 		closeEditCategory();
 	};
 
+	// ── Déplacement de diapositive avec persistance DB ─────────────────────────
+
+	const handleMoveAndSaveSlide = async (slideId, direction) => {
+		const slides = [...homeContent.carousel];
+		const index = slides.findIndex((s) => s.id === slideId);
+		const targetIndex = direction === 'up' ? index - 1 : index + 1;
+		if (index < 0 || targetIndex < 0 || targetIndex >= slides.length) return;
+		[slides[index], slides[targetIndex]] = [slides[targetIndex], slides[index]];
+
+		// Mise à jour immédiate de la page d'accueil (temps réel)
+		onUpdateCarousel?.(slides);
+
+		// Persistance en base pour les diapositives backend
+		for (let i = 0; i < slides.length; i++) {
+			const s = slides[i];
+			if (isBackendId(s.id)) {
+				try {
+					await adminService.updateCarouselSlide(s.id, toApiSlide(s, i));
+				} catch (e) {
+					console.warn('[admin] update carousel order:', e.message);
+				}
+			}
+		}
+	};
+
 	// ── Top produits helpers ────────────────────────────────────────────────────
 
 	const featuredProducts = useMemo(
@@ -143,8 +170,12 @@ export default function Admin({
 		const target = direction === 'up' ? idx - 1 : idx + 1;
 		if (idx < 0 || target < 0 || target >= sorted.length) return;
 		[sorted[idx], sorted[target]] = [sorted[target], sorted[idx]];
+		// Réassigne des rangs consécutifs et persiste en base
 		sorted.forEach((p, i) => {
-			if (p.featuredRank !== i + 1) onToggleFeatured?.(p.id);
+			const newRank = i + 1;
+			if (p.featuredRank !== newRank) {
+				(onSetProductFeaturedRank ?? onToggleFeatured)?.(p.id, newRank);
+			}
 		});
 	};
 
@@ -247,8 +278,8 @@ export default function Admin({
 									{slide.text && <p className="helper-text" style={{ margin: 0 }}>{slide.text}</p>}
 								</div>
 								<div className="inline-actions" style={{ flexShrink: 0 }}>
-									<button className="btn btn--secondary" type="button" onClick={() => onMoveCarouselSlide(slide.id, 'up')} disabled={index === 0} aria-label="Monter">↑</button>
-									<button className="btn btn--secondary" type="button" onClick={() => onMoveCarouselSlide(slide.id, 'down')} disabled={index === homeContent.carousel.length - 1} aria-label="Descendre">↓</button>
+									<button className="btn btn--secondary" type="button" onClick={() => handleMoveAndSaveSlide(slide.id, 'up')} disabled={index === 0} aria-label="Monter">↑</button>
+									<button className="btn btn--secondary" type="button" onClick={() => handleMoveAndSaveSlide(slide.id, 'down')} disabled={index === homeContent.carousel.length - 1} aria-label="Descendre">↓</button>
 									<button className="btn btn--secondary" type="button" onClick={() => openEditSlide(slide)}>Modifier</button>
 									<button
 										className="btn btn--secondary"

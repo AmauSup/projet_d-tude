@@ -564,6 +564,15 @@ export default function App() {
     );
   };
 
+  const handleSetProductFeaturedRank = (productId, rank) => {
+    adminService.updateProduct(productId, { featured: rank }).catch(console.error);
+    setProducts((previous) =>
+      previous.map((p) =>
+        p.id === productId ? { ...p, featuredRank: rank } : p,
+      ),
+    );
+  };
+
   const handleDeleteProduct = (productId) => {
     if (!window.confirm("Supprimer ce produit de l'interface admin ?")) {
       return;
@@ -865,10 +874,10 @@ export default function App() {
                   products={products}
                   orders={orders}
                   onUpdateHomeMessage={handleUpdateHomeMessage}
-                  onMoveCarouselSlide={handleMoveCarouselSlide}
                   onToggleProductPriority={handleToggleProductPriority}
                   onToggleProductAvailability={handleToggleProductAvailability}
                   onToggleFeatured={handleToggleFeatured}
+                  onSetProductFeaturedRank={handleSetProductFeaturedRank}
                   onSetCategoryOrder={handleSetCategoryOrder}
                   onOpenProduct={handleProductNavigation}
                   onUpdateCarousel={handleUpdateCarousel}

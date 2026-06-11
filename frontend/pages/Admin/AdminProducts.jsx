@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { adminService } from '../../services/adminService.js';
 
-const EMPTY_FORM = { name: '', description: '', characteristics: '', price: '', stock: '', image: '', category_id: '' };
+const EMPTY_FORM = {
+  name: '', description: '', characteristics: '',
+  price: '', stock: '', image: '', category_id: '',
+  priority: '0', featured: '0',
+};
 
 CreateProductForm.propTypes = {
   categories: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.number, name: PropTypes.string })).isRequired,
@@ -34,6 +38,8 @@ function CreateProductForm({ categories, onCreated, onCancel }) {
         stock: Number.parseInt(form.stock, 10),
         image: form.image || null,
         category_id: Number.parseInt(form.category_id, 10),
+        priority: Number.parseInt(form.priority, 10) || 0,
+        featured: Number.parseInt(form.featured, 10) || 0,
       });
       onCreated();
     } catch (err) {
@@ -79,6 +85,14 @@ function CreateProductForm({ categories, onCreated, onCancel }) {
           <label className="form-label" htmlFor="new-img">URL de l'image</label>
           <input id="new-img" className="input" type="url" placeholder="https://…" value={form.image} onChange={(e) => set('image', e.target.value)} />
         </div>
+        <div>
+          <label className="form-label" htmlFor="new-priority">Priorité (0 = aucune)</label>
+          <input id="new-priority" className="input" type="number" min="0" max="99" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="new-featured">Mis en avant — rang (0 = non)</label>
+          <input id="new-featured" className="input" type="number" min="0" max="99" value={form.featured} onChange={(e) => set('featured', e.target.value)} />
+        </div>
       </div>
       <div className="inline-actions">
         <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Création…' : 'Créer le produit'}</button>
@@ -122,6 +136,8 @@ function EditProductForm({ product, categories, onSaved, onCancel }) {
     stock: product.stock != null ? String(product.stock) : '',
     image: product.image || '',
     category_id: product.category_id != null ? String(product.category_id) : '',
+    priority: product.priority != null ? String(product.priority) : '0',
+    featured: product.featured != null ? String(product.featured) : '0',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -145,6 +161,8 @@ function EditProductForm({ product, categories, onSaved, onCancel }) {
         stock: Number.parseInt(form.stock, 10),
         image: form.image || null,
         category_id: Number.parseInt(form.category_id, 10),
+        priority: Number.parseInt(form.priority, 10) || 0,
+        featured: Number.parseInt(form.featured, 10) || 0,
       });
       onSaved();
     } catch (err) {
@@ -190,12 +208,75 @@ function EditProductForm({ product, categories, onSaved, onCancel }) {
           <label className="form-label" htmlFor="edit-img">URL de l'image</label>
           <input id="edit-img" className="input" type="url" placeholder="https://…" value={form.image} onChange={(e) => set('image', e.target.value)} />
         </div>
+        <div>
+          <label className="form-label" htmlFor="edit-priority">
+            Priorité <span className="helper-text">(0 = aucune · plus grand = plus prioritaire)</span>
+          </label>
+          <input id="edit-priority" className="input" type="number" min="0" max="99" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="edit-featured">
+            Mis en avant <span className="helper-text">(0 = non · rang sur la page d'accueil)</span>
+          </label>
+          <input id="edit-featured" className="input" type="number" min="0" max="99" value={form.featured} onChange={(e) => set('featured', e.target.value)} />
+        </div>
       </div>
       <div className="inline-actions">
         <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Sauvegarde…' : 'Enregistrer'}</button>
         <button type="button" className="btn btn--secondary" onClick={onCancel}>Annuler</button>
       </div>
     </form>
+  );
+}
+
+/* Inline editable number cell — click the pill to edit in place */
+InlineNumberCell.propTypes = {
+  value: PropTypes.number.isRequired,
+  productId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  onSave: PropTypes.func.isRequired,
+  renderPill: PropTypes.func.isRequired,
+};
+
+function InlineNumberCell({ value, productId, onSave, renderPill }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const open = () => { setDraft(String(value)); setEditing(true); };
+  const cancel = () => setEditing(false);
+  const commit = () => {
+    const num = Number.parseInt(draft, 10);
+    if (!Number.isNaN(num) && num >= 0) onSave(productId, num);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        className="input"
+        type="number"
+        min="0"
+        max="9999"
+        autoFocus
+        value={draft}
+        style={{ width: 72 }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+      />
+    );
+  }
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      title="Cliquer pour modifier"
+      style={{ cursor: 'pointer' }}
+      onClick={open}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') open(); }}
+    >
+      {renderPill(value)}
+    </span>
   );
 }
 
@@ -267,36 +348,34 @@ export default function AdminProducts() {
     } catch (e) { setError(e.message); }
   };
 
-  const handleToggleStock = async (product) => {
-    const newStock = product.stock > 0 ? 0 : 10;
-    try {
-      await adminService.updateProduct(product.id, { stock: newStock });
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, stock: newStock } : p)));
-    } catch (e) { setError(e.message); }
-  };
-
-  const handleToggleFeatured = async (product) => {
-    const newFeatured = product.featured > 0 ? 0 : 1;
-    try {
-      await adminService.updateProduct(product.id, { featured: newFeatured });
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, featured: newFeatured } : p)));
-    } catch (e) { setError(e.message); }
-  };
-
-  const handleTogglePriority = async (product) => {
-    const newPriority = product.priority > 0 ? 0 : 5;
-    try {
-      await adminService.updateProduct(product.id, { priority: newPriority });
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, priority: newPriority } : p)));
-    } catch (e) { setError(e.message); }
-  };
-
   const handleDelete = async (product) => {
     if (!globalThis.confirm(`Supprimer "${product.name}" ?`)) return;
     try {
       await adminService.deleteProduct(product.id);
       setProducts((prev) => prev.filter((p) => p.id !== product.id));
       setSelected((prev) => { const next = new Set(prev); next.delete(product.id); return next; });
+    } catch (e) { setError(e.message); }
+  };
+
+  /* Inline-edit handlers for stock / priority / featured */
+  const handleSaveStock = async (productId, newStock) => {
+    try {
+      await adminService.updateProduct(productId, { stock: newStock });
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p)));
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleSavePriority = async (productId, newPriority) => {
+    try {
+      await adminService.updateProduct(productId, { priority: newPriority });
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, priority: newPriority } : p)));
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleSaveFeatured = async (productId, newFeatured) => {
+    try {
+      await adminService.updateProduct(productId, { featured: newFeatured });
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, featured: newFeatured } : p)));
     } catch (e) { setError(e.message); }
   };
 
@@ -355,17 +434,16 @@ export default function AdminProducts() {
         )}
       </div>
 
+      <p className="helper-text" style={{ marginTop: 0 }}>
+        Cliquez sur les valeurs <strong>Stock</strong>, <strong>Priorité</strong> ou <strong>Mis en avant</strong> pour les modifier directement.
+      </p>
+
       <div className="admin-table-wrapper">
         <table className="admin-table">
           <thead>
             <tr>
               <th>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  aria-label="Tout sélectionner"
-                />
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Tout sélectionner" />
               </th>
               <th><SortBtn field="name" label="Nom" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th>Catégorie</th>
@@ -396,39 +474,60 @@ export default function AdminProducts() {
                 </td>
                 <td>{product.category_name || '—'}</td>
                 <td>{Number(product.price).toFixed(2)} €</td>
+
+                {/* Stock — édition inline au clic */}
                 <td>
-                  <span className={`status-pill ${product.stock > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
-                    {product.stock > 0 ? `${product.stock} en stock` : 'Rupture'}
-                  </span>
+                  <InlineNumberCell
+                    value={Number(product.stock) || 0}
+                    productId={product.id}
+                    onSave={handleSaveStock}
+                    renderPill={(v) => (
+                      <span className={`status-pill ${v > 0 ? 'status-pill--ok' : 'status-pill--danger'}`}>
+                        {v > 0 ? `${v} en stock` : 'Rupture'}
+                      </span>
+                    )}
+                  />
                 </td>
+
+                {/* Priorité — édition inline au clic */}
                 <td>
-                  {product.priority > 0
-                    ? <span className="status-pill status-pill--warning">#{product.priority}</span>
-                    : <span className="helper-text">–</span>}
+                  <InlineNumberCell
+                    value={Number(product.priority) || 0}
+                    productId={product.id}
+                    onSave={handleSavePriority}
+                    renderPill={(v) => v > 0
+                      ? <span className="status-pill status-pill--warning">#{v}</span>
+                      : <span className="helper-text">–</span>}
+                  />
                 </td>
+
+                {/* Mis en avant — édition inline au clic */}
                 <td>
-                  {product.featured > 0
-                    ? <span className="status-pill status-pill--ok">★ #{product.featured}</span>
-                    : <span className="helper-text">–</span>}
+                  <InlineNumberCell
+                    value={Number(product.featured) || 0}
+                    productId={product.id}
+                    onSave={handleSaveFeatured}
+                    renderPill={(v) => v > 0
+                      ? <span className="status-pill status-pill--ok">★ {v}</span>
+                      : <span className="helper-text">–</span>}
+                  />
                 </td>
+
+                {/* Actions — Modifier + Supprimer uniquement */}
                 <td>
-                  <div className="inline-actions">
-                    <button type="button" className="btn btn--primary" onClick={() => { setEditProduct(product); setShowCreate(false); }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                      onClick={() => { setEditProduct(product); setShowCreate(false); }}
+                    >
                       Modifier
-                    </button>
-                    <button type="button" className="btn btn--secondary" onClick={() => handleToggleStock(product)}>
-                      {product.stock > 0 ? 'Rupture' : '+ Stock'}
-                    </button>
-                    <button type="button" className="btn btn--secondary" onClick={() => handleTogglePriority(product)}>
-                      {product.priority > 0 ? '↓ Déprioriser' : '↑ Prioriser'}
-                    </button>
-                    <button type="button" className="btn btn--secondary" onClick={() => handleToggleFeatured(product)}>
-                      {product.featured > 0 ? '★ Retirer' : '☆ Mettre en avant'}
                     </button>
                     <button
                       type="button"
                       className="btn btn--secondary"
-                      style={{ color: 'var(--color-danger, #c0392b)' }}
+                      style={{ fontSize: '0.82rem', padding: '6px 14px', color: 'var(--color-danger, #c0392b)' }}
                       onClick={() => handleDelete(product)}
                     >
                       Supprimer

@@ -61,7 +61,7 @@ function normalizeCarouselSlide(s) {
     imageUrl: s.image_url || s.imageUrl || '',
     ctaLabel: s.cta_label || s.ctaLabel || 'Voir la catégorie',
     categorySlug: s.link_url || s.categorySlug || '',
-    orderIndex: s.order_index ?? s.orderIndex ?? 0,
+    orderIndex: Number(s.order_index ?? s.orderIndex ?? 0),
   };
 }
 

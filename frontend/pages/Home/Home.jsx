@@ -123,9 +123,11 @@ export default function Home({
 
       <Carousel slides={homeContent.carousel} onOpenCategory={onOpenCategory} />
 
-      <div className="notice notice--info home-fixed-message">
-        {t('home.fixedMessage')}
-      </div>
+      {(homeContent.fixedMessage || t('home.fixedMessage')) && (
+        <div className="notice notice--info home-fixed-message">
+          {homeContent.fixedMessage || t('home.fixedMessage')}
+        </div>
+      )}
 
       <section className="home-section">
         <h2>{t('home.popularCategories')}</h2>

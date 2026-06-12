@@ -2,28 +2,9 @@ import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import './OrderHistory.css';
 import { formatPrice } from '../../utils/storefront.js';
+import { useI18n } from '../../contexts/I18nContext.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-
-function downloadInvoice(orderId) {
-	const token = localStorage.getItem('althea-auth-token') || sessionStorage.getItem('althea-auth-token') || '';
-	fetch(`${API_BASE}/pg/orders/${orderId}/invoice`, {
-		headers: token ? { Authorization: `Bearer ${token}` } : {},
-	})
-		.then((res) => {
-			if (!res.ok) throw new Error('Erreur téléchargement');
-			return res.blob();
-		})
-		.then((blob) => {
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `facture-${orderId}.pdf`;
-			a.click();
-			URL.revokeObjectURL(url);
-		})
-		.catch((e) => alert(`Impossible de télécharger la facture : ${e.message}`));
-}
 
 OrderHistory.propTypes = {
   orders: PropTypes.arrayOf(PropTypes.shape({
@@ -48,10 +29,41 @@ OrderHistory.propTypes = {
 };
 
 export default function OrderHistory({ orders = [], products = [], onNavigate, onAddToCart }) {
+	const { t } = useI18n();
 	const [expanded, setExpanded] = useState(null);
 	const [search, setSearch] = useState('');
 	const [yearFilter, setYearFilter] = useState('all');
 	const [statusFilter, setStatusFilter] = useState('all');
+	const [invoiceError, setInvoiceError] = useState('');
+	const [invoiceLoading, setInvoiceLoading] = useState('');
+
+	const downloadInvoice = async (orderId) => {
+		setInvoiceLoading(orderId);
+		setInvoiceError('');
+		try {
+			const token = localStorage.getItem('althea-auth-token') || sessionStorage.getItem('althea-auth-token') || '';
+			const res = await fetch(`${API_BASE}/pg/orders/${orderId}/invoice`, {
+				headers: token ? { Authorization: `Bearer ${token}` } : {},
+			});
+			if (!res.ok) {
+				let msg = 'Erreur lors du téléchargement.';
+				try { const data = await res.json(); msg = data.message || msg; } catch { /* ignore */ }
+				setInvoiceError(msg);
+				return;
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `facture-${orderId}.pdf`;
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (e) {
+			setInvoiceError(e.message || 'Erreur réseau.');
+		} finally {
+			setInvoiceLoading('');
+		}
+	};
 
 	const years = useMemo(() => {
 		const set = new Set(orders.map((o) => (o.createdAt ? o.createdAt.slice(0, 4) : null)).filter(Boolean));
@@ -87,8 +99,8 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 	return (
 		<section className="page order-page">
 			<header className="page__header">
-				<h1 className="page__title">Historique des commandes</h1>
-				<p className="page__subtitle">Consultez vos commandes d'équipements médicaux et leur statut.</p>
+				<h1 className="page__title">{t('orders.title')}</h1>
+				<p className="page__subtitle">{t('orders.subtitle')}</p>
 			</header>
 
 			<div className="inline-actions" style={{ marginBottom: 16 }}>
@@ -96,7 +108,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 					className="input"
 					style={{ flex: 1 }}
 					type="search"
-					placeholder="Rechercher par n° commande ou nom produit…"
+					placeholder={t('orders.searchPlaceholder')}
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
 				/>
@@ -105,9 +117,9 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 					style={{ width: 'auto' }}
 					value={yearFilter}
 					onChange={(e) => setYearFilter(e.target.value)}
-					aria-label="Filtrer par année"
+					aria-label={t('orders.allYears')}
 				>
-					<option value="all">Toutes les années</option>
+					<option value="all">{t('orders.allYears')}</option>
 					{years.map((y) => (
 						<option key={y} value={y}>{y}</option>
 					))}
@@ -117,18 +129,18 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 					style={{ width: 'auto' }}
 					value={statusFilter}
 					onChange={(e) => setStatusFilter(e.target.value)}
-					aria-label="Filtrer par statut"
+					aria-label={t('orders.allStatuses')}
 				>
-					<option value="all">Tous les statuts</option>
-					<option value="active">Actives (en cours)</option>
-					<option value="delivered">Livrées</option>
-					<option value="cancelled">Annulées</option>
+					<option value="all">{t('orders.allStatuses')}</option>
+					<option value="active">{t('orders.statusActive')}</option>
+					<option value="delivered">{t('orders.statusDelivered')}</option>
+					<option value="cancelled">{t('orders.statusCancelled')}</option>
 				</select>
 			</div>
 
 			{byYear.length === 0 && (
 				<div className="notice notice--info">
-					{orders.length === 0 ? "Vous n'avez pas encore de commande." : 'Aucune commande ne correspond à la recherche.'}
+					{orders.length === 0 ? t('orders.noOrders') : t('orders.noResults')}
 				</div>
 			)}
 
@@ -144,7 +156,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 									<div>
 										<h3 style={{ marginBottom: 4 }}>{order.id}</h3>
 										<p className="helper-text">
-											{new Date(order.createdAt).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+											{new Date(order.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
 										</p>
 									</div>
 									<div className="inline-actions">
@@ -156,14 +168,14 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 											onClick={() => setExpanded(expanded === order.id ? null : order.id)}
 											aria-expanded={expanded === order.id}
 										>
-											{expanded === order.id ? 'Fermer' : 'Voir le détail'}
+											{expanded === order.id ? t('orders.close') : t('orders.viewDetail')}
 										</button>
 									</div>
 								</div>
 
 								{expanded === order.id ? (
 									<div className="panel stack" style={{ marginTop: 16 }}>
-										<h4>Produits commandés</h4>
+										<h4>{t('orders.products')}</h4>
 										{order.items.map((item) => {
 											const product = products.find((p) => p.id === item.productId);
 											return (
@@ -174,27 +186,33 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 											);
 										})}
 										<hr />
-										<p><strong>Total : {formatPrice(order.totalCents)}</strong></p>
+										<p><strong>{t('orders.total')} {formatPrice(order.totalCents)}</strong></p>
 										{order.billingAddress ? (
 											<>
-												<h4>Adresse de facturation</h4>
+												<h4>{t('orders.billingAddress')}</h4>
 												<p>{order.billingAddress.firstName} {order.billingAddress.lastName}</p>
 												<p>{order.billingAddress.address1}, {order.billingAddress.city} {order.billingAddress.postalCode}</p>
 											</>
 										) : null}
 										{order.paymentSummary ? (
 											<>
-												<h4>Paiement</h4>
+												<h4>{t('orders.payment')}</h4>
 												<p>{order.paymentSummary}</p>
 											</>
 										) : null}
+										{invoiceError && expanded === order.id && (
+											<div className="notice notice--warning" role="alert" style={{ marginTop: 8 }}>
+												{invoiceError}
+											</div>
+										)}
 										<div className="page-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>
 											<button
 												type="button"
 												className="btn btn--secondary"
+												disabled={invoiceLoading === order.id}
 												onClick={() => downloadInvoice(order.id)}
 											>
-												Télécharger la facture PDF
+												{invoiceLoading === order.id ? t('orders.downloading') : t('orders.downloadInvoice')}
 											</button>
 											{onAddToCart && (
 												<button
@@ -205,7 +223,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 														onNavigate('/cart');
 													}}
 												>
-													Renouveler la commande
+													{t('orders.reorder')}
 												</button>
 											)}
 										</div>
@@ -218,7 +236,7 @@ export default function OrderHistory({ orders = [], products = [], onNavigate, o
 			))}
 
 			<div className="page-actions" style={{ marginTop: 32 }}>
-				<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>Retour à mon compte</button>
+				<button className="btn btn--secondary" type="button" onClick={() => onNavigate('/account')}>{t('orders.back')}</button>
 			</div>
 		</section>
 	);

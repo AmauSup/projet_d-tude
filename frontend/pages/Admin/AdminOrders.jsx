@@ -76,7 +76,11 @@ export default function AdminOrders() {
                   N°{sortIndicator('id')}
                 </button>
               </th>
-              <th>Client</th>
+              <th>
+                <button type="button" className="btn btn--link" onClick={() => toggleSort('first_name')}>
+                  Client{sortIndicator('first_name')}
+                </button>
+              </th>
               <th>
                 <button type="button" className="btn btn--link" onClick={() => toggleSort('created_at')}>
                   Date{sortIndicator('created_at')}
@@ -87,7 +91,11 @@ export default function AdminOrders() {
                   Total{sortIndicator('total_amount')}
                 </button>
               </th>
-              <th>Statut</th>
+              <th>
+                <button type="button" className="btn btn--link" onClick={() => toggleSort('status')}>
+                  Statut{sortIndicator('status')}
+                </button>
+              </th>
               <th>Détails</th>
             </tr>
           </thead>

@@ -154,6 +154,38 @@
   color: #334155;
 }
 
+/* ── Dark mode ─────────────────────────────────────────────────── */
+[data-theme="dark"] .home-slide--single,
+[data-theme="dark"] .home-slide {
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.10), transparent 32%),
+    linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
+}
+
+[data-theme="dark"] .home-slide__content h3,
+[data-theme="dark"] .home-slide h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .home-slide__content p,
+[data-theme="dark"] .home-slide p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .home-card h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .home-card p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .home-price {
+  color: #38bdf8;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .home-carousel {
     grid-template-columns: 1fr;

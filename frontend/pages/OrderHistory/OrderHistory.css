@@ -27,6 +27,17 @@
   margin-top: 8px;
 }
 
+/* ── Dark mode ─────────────────────────────────────────────────── */
+[data-theme="dark"] .order-item {
+  background: var(--color-card, #1e293b);
+  border-color: #334155;
+  border-left-color: #0ea5e9;
+}
+
+[data-theme="dark"] .order-item strong {
+  color: var(--color-text, #f1f5f9);
+}
+
 @media (max-width: 768px) {
   .order-item {
     padding: 16px !important;

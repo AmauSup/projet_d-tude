@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { apiClient } from '../../services/apiClient.js';
 import { useI18n } from '../../contexts/I18nContext.jsx';
@@ -38,6 +38,56 @@ export default function AccountSettings({ user = {}, onSave, onNavigate, onLogou
   const [deleteMsg, setDeleteMsg] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // Moyens de paiement
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [pmLoading, setPmLoading] = useState(false);
+  const [pmError, setPmError] = useState('');
+  const [pmSuccess, setPmSuccess] = useState('');
+  const [showAddPm, setShowAddPm] = useState(false);
+  const [pmForm, setPmForm] = useState({ cardholder_name: '', card_number: '', expiry: '', is_default: false });
+
+  useEffect(() => {
+    apiClient.get('/pg/auth/payment-methods')
+      .then((data) => setPaymentMethods(data.paymentMethods || []))
+      .catch(() => {});
+  }, []);
+
+  const handleAddPaymentMethod = async () => {
+    setPmError('');
+    setPmSuccess('');
+    setPmLoading(true);
+    try {
+      const data = await apiClient.post('/pg/auth/payment-methods', pmForm);
+      setPaymentMethods((prev) => [data.paymentMethod, ...prev]);
+      setPmForm({ cardholder_name: '', card_number: '', expiry: '', is_default: false });
+      setShowAddPm(false);
+      setPmSuccess('Moyen de paiement ajouté.');
+    } catch (err) {
+      setPmError(err.message || 'Erreur lors de l\'ajout.');
+    } finally {
+      setPmLoading(false);
+    }
+  };
+
+  const handleSetDefaultPm = async (id) => {
+    try {
+      await apiClient.patch(`/pg/auth/payment-methods/${id}/default`);
+      setPaymentMethods((prev) => prev.map((pm) => ({ ...pm, is_default: pm.id === id })));
+    } catch (err) {
+      setPmError(err.message || 'Erreur.');
+    }
+  };
+
+  const handleDeletePm = async (id) => {
+    if (!window.confirm('Supprimer ce moyen de paiement ?')) return;
+    try {
+      await apiClient.delete(`/pg/auth/payment-methods/${id}`);
+      setPaymentMethods((prev) => prev.filter((pm) => pm.id !== id));
+    } catch (err) {
+      setPmError(err.message || 'Erreur.');
+    }
+  };
 
   const handleSaveProfile = async () => {
     setProfileLoading(true);
@@ -275,6 +325,79 @@ export default function AccountSettings({ user = {}, onSave, onNavigate, onLogou
           </div>
         </article>
       </div>
+
+        <article className="card stack">
+          <h2>Moyens de paiement</h2>
+          {pmError && <div className="notice notice--warning" role="alert">{pmError}</div>}
+          {pmSuccess && <div className="notice notice--success" role="alert">{pmSuccess}</div>}
+
+          {paymentMethods.length === 0 && !showAddPm && (
+            <p className="helper-text">Aucun moyen de paiement enregistré.</p>
+          )}
+
+          {paymentMethods.map((pm) => (
+            <div key={pm.id} className="panel" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ flex: 1 }}>
+                <strong>•••• {pm.last4}</strong>
+                <span className="helper-text" style={{ marginLeft: 8 }}>
+                  {pm.cardholder_name} — exp. {String(pm.expiry_month).padStart(2, '0')}/{pm.expiry_year}
+                </span>
+                {pm.is_default && <span className="status-pill status-pill--ok" style={{ marginLeft: 8 }}>Défaut</span>}
+              </span>
+              <div className="inline-actions">
+                {!pm.is_default && (
+                  <button type="button" className="btn btn--secondary" onClick={() => handleSetDefaultPm(pm.id)}>
+                    Définir par défaut
+                  </button>
+                )}
+                <button type="button" className="btn btn--secondary" style={{ color: 'var(--color-danger, #c0392b)' }} onClick={() => handleDeletePm(pm.id)}>
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {showAddPm ? (
+            <div className="stack" style={{ marginTop: 8 }}>
+              <div className="form-grid">
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" htmlFor="pm-name">Titulaire de la carte</label>
+                  <input id="pm-name" className="input" placeholder="Prénom NOM" value={pmForm.cardholder_name}
+                    onChange={(e) => setPmForm({ ...pmForm, cardholder_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label" htmlFor="pm-number">Numéro de carte</label>
+                  <input id="pm-number" className="input" placeholder="1234 5678 9012 3456" maxLength={19}
+                    value={pmForm.card_number}
+                    onChange={(e) => setPmForm({ ...pmForm, card_number: e.target.value.replace(/[^\d ]/g, '') })} />
+                </div>
+                <div>
+                  <label className="form-label" htmlFor="pm-expiry">Date d'expiration (MM/AA)</label>
+                  <input id="pm-expiry" className="input" placeholder="MM/AA" maxLength={5}
+                    value={pmForm.expiry}
+                    onChange={(e) => setPmForm({ ...pmForm, expiry: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input id="pm-default" type="checkbox" checked={pmForm.is_default}
+                    onChange={(e) => setPmForm({ ...pmForm, is_default: e.target.checked })} />
+                  <label htmlFor="pm-default" className="form-label" style={{ margin: 0 }}>Définir comme moyen de paiement par défaut</label>
+                </div>
+              </div>
+              <div className="inline-actions">
+                <button type="button" className="btn btn--secondary" onClick={() => { setShowAddPm(false); setPmError(''); }}>Annuler</button>
+                <button type="button" className="btn btn--primary" onClick={handleAddPaymentMethod} disabled={pmLoading}>
+                  {pmLoading ? 'Ajout…' : 'Ajouter la carte'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="page-actions" style={{ justifyContent: 'flex-start' }}>
+              <button type="button" className="btn btn--secondary" onClick={() => { setShowAddPm(true); setPmSuccess(''); setPmError(''); }}>
+                + Ajouter un moyen de paiement
+              </button>
+            </div>
+          )}
+        </article>
 
         <article className="card stack" style={{ borderColor: '#fca5a5' }}>
           <h2 style={{ color: '#b91c1c' }}>Supprimer mon compte</h2>

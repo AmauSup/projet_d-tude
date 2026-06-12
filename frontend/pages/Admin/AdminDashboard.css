@@ -103,6 +103,27 @@
   flex-shrink: 0;
 }
 
+/* ── Dark mode ─────────────────────────────────────────────────── */
+[data-theme="dark"] .chart-title {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .bar-value {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .bar-label {
+  color: #64748b;
+}
+
+[data-theme="dark"] .pie-legend__item {
+  color: var(--color-text, #f1f5f9);
+}
+
+[data-theme="dark"] .bar-chart {
+  border-bottom-color: #334155;
+}
+
 @media (max-width: 1100px) {
   .dashboard-charts {
     grid-template-columns: 1fr 1fr;

@@ -32,6 +32,11 @@ async function request(path, options = {}) {
   const payload = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      globalThis.localStorage?.removeItem(AUTH_TOKEN_KEY);
+      globalThis.sessionStorage?.removeItem(AUTH_TOKEN_KEY);
+      globalThis.dispatchEvent?.(new CustomEvent('althea:unauthorized'));
+    }
     throw new Error(payload?.message || `Erreur HTTP ${response.status}`);
   }
 

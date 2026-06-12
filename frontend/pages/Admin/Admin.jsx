@@ -196,7 +196,7 @@ export default function Admin({
 			<div className="admin-sections">
 
 				{/* ── Message fixe ─────────────────────────────────────────── */}
-				<article className="card stack">
+				<article className="card stack admin-full">
 					<h3>Message fixe (sous le carrousel)</h3>
 					<textarea className="textarea" rows="3" value={homeMessage} onChange={(e) => setHomeMessage(e.target.value)} />
 					<div className="page-actions">
@@ -210,7 +210,7 @@ export default function Admin({
 				</article>
 
 				{/* ── Carrousel ────────────────────────────────────────────── */}
-				<article className="card stack">
+				<article className="card stack admin-full">
 					<div className="inline-actions" style={{ justifyContent: 'space-between' }}>
 						<h3 style={{ margin: 0 }}>Carrousel d'accueil ({homeContent.carousel.length} section(s))</h3>
 						<button className="btn btn--primary" type="button" onClick={openAddSlide}>
@@ -390,7 +390,7 @@ export default function Admin({
 				</article>
 
 				{/* ── Gestion stocks & priorités ────────────────────────────── */}
-				<article className="card stack">
+				<article className="card stack admin-full">
 					<h3>Produits — priorité & disponibilité</h3>
 					<div className="table-like">
 						{products.slice(0, 50).map((product) => (

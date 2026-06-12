@@ -254,6 +254,10 @@
   color: #7dd3fc;
 }
 
+[data-theme="dark"] .site-header__burger .burger-icon span {
+  background: #f1f5f9;
+}
+
 [data-theme="dark"] .site-header__burger-menu {
   background: #1e293b;
   border-color: #334155;

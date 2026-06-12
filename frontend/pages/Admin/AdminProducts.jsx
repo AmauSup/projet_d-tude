@@ -446,7 +446,7 @@ export default function AdminProducts() {
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Tout sélectionner" />
               </th>
               <th><SortBtn field="name" label="Nom" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
-              <th>Catégorie</th>
+              <th><SortBtn field="category_name" label="Catégorie" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th><SortBtn field="price" label="Prix" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th><SortBtn field="stock" label="Stock" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th><SortBtn field="priority" label="Priorité" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>

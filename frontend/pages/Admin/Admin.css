@@ -1,3 +1,27 @@
+/* ── Admin homepage 2-col layout ──────────────────────────────── */
+.admin-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.admin-sections .admin-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .admin-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sections .admin-full {
+    grid-column: 1;
+  }
+}
+
+/* ── Metric grid ───────────────────────────────────────────────── */
 .admin-page .metric-grid {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr));

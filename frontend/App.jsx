@@ -215,6 +215,19 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Redirection automatique vers /login si le token expire (401 reçu)
+  useEffect(() => {
+    const handler = () => {
+      setSession({ isAuthenticated: false, role: 'guest' });
+      setUserProfile(initialUser);
+      setOrders([]);
+      navigate('/login');
+    };
+    window.addEventListener('althea:unauthorized', handler);
+    return () => window.removeEventListener('althea:unauthorized', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const pathSegments = location.pathname.split('/').filter(Boolean);
 

@@ -1,3 +1,28 @@
+/* ── Admin layout : nav en haut, contenu en dessous ───────────── */
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.admin-content {
+  width: 100%;
+}
+
+.admin-nav .btn--secondary.is-active {
+  background: #0369a1;
+  color: #ffffff;
+  border-color: #0369a1;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .admin-nav .btn--secondary.is-active {
+  background: #0ea5e9;
+  color: #0f172a;
+  border-color: #0ea5e9;
+}
+
 /* ── Admin homepage 2-col layout ──────────────────────────────── */
 .admin-sections {
   display: grid;
@@ -19,6 +44,117 @@
   .admin-sections .admin-full {
     grid-column: 1;
   }
+}
+
+/* ── Gestion page d'accueil : grille 5 sections ────────────────── */
+.admin-homepage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.admin-homepage-grid .admin-homepage-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .admin-homepage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-homepage-grid .admin-homepage-full {
+    grid-column: 1;
+  }
+}
+
+/* ── Table-like rows (homepage admin) ─────────────────────────── */
+.table-like {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-like__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #ffffff);
+  min-width: 0;
+}
+
+[data-theme="dark"] .table-like__row {
+  border-color: #334155;
+  background: #1e293b;
+}
+
+/* ── Admin table ───────────────────────────────────────────────── */
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  text-align: left;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #0f172a);
+}
+
+.admin-table thead th {
+  background: var(--color-surface-2, #f8fafc);
+  font-weight: 600;
+  color: var(--color-text-muted, #475569);
+}
+
+.admin-table tbody tr:hover td {
+  background: var(--color-primary-50, #e0f2fe);
+}
+
+.admin-table tbody tr.is-selected td {
+  background: #bfdbfe;
+}
+
+.admin-message-body {
+  background: var(--color-surface-2, #f8fafc);
+  padding: 12px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .admin-table th,
+[data-theme="dark"] .admin-table td {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .admin-table thead th {
+  background: #0f172a;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .admin-table tbody tr:hover td {
+  background: #1e3a5f;
+}
+
+[data-theme="dark"] .admin-table tbody tr.is-selected td {
+  background: #1e3a5f;
+  color: #e0f2fe;
+}
+
+[data-theme="dark"] .admin-message-body {
+  background: #0f172a;
 }
 
 /* ── Metric grid ───────────────────────────────────────────────── */

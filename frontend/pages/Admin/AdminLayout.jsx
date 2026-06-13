@@ -19,19 +19,19 @@ export default function AdminLayout() {
         <p className="page__subtitle">Base frontend admin prête pour brancher le backend.</p>
       </header>
 
-      <div className="admin-sections">
-        <nav className="inline-actions" aria-label="Navigation admin">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) => `btn btn--secondary ${isActive ? 'is-active' : ''}`}
-            >
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
+      <nav className="admin-nav" aria-label="Navigation admin">
+        {links.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) => `btn btn--secondary ${isActive ? 'is-active' : ''}`}
+          >
+            {link.label}
+          </NavLink>
+        ))}
+      </nav>
 
+      <div className="admin-content">
         <Outlet />
       </div>
     </section>

@@ -1,13 +1,18 @@
 /* --- Carrousel --- */
 .home-carousel-wrapper {
-  position: relative;
   margin-bottom: 34px;
-  border-radius: 22px;
-  overflow: hidden;
+}
+
+/* 3 colonnes : flèche | contenu | flèche */
+.home-carousel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .home-slide--single {
-  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 32px;
@@ -17,7 +22,7 @@
     radial-gradient(circle at top right, rgba(14, 165, 233, 0.18), transparent 32%),
     linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
   border-radius: 22px;
-  padding: 32px 80px;
+  padding: 32px 40px;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
@@ -27,6 +32,11 @@
   object-fit: cover;
   border-radius: 12px;
   flex-shrink: 0;
+}
+
+.home-slide__content {
+  flex: 1;
+  min-width: 0;
 }
 
 .home-slide__content h3 {
@@ -42,14 +52,12 @@
 }
 
 .carousel-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid #e2e8f0;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -58,21 +66,16 @@
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   transition: background 0.2s;
-  z-index: 2;
+  color: #0f172a;
 }
 
 .carousel-arrow:hover { background: #fff; }
-.carousel-arrow--prev { left: 12px; }
-.carousel-arrow--next { right: 12px; }
 
 .carousel-dots {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
+  justify-content: center;
   gap: 8px;
-  z-index: 2;
+  padding: 10px 0 2px;
 }
 
 .carousel-dot {
@@ -155,6 +158,16 @@
 }
 
 /* ── Dark mode ─────────────────────────────────────────────────── */
+[data-theme="dark"] .carousel-arrow {
+  background: rgba(15, 23, 42, 0.90);
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .carousel-arrow:hover {
+  background: rgba(30, 41, 59, 0.98);
+}
+
 [data-theme="dark"] .home-slide--single,
 [data-theme="dark"] .home-slide {
   background:
@@ -195,9 +208,13 @@
     padding: 20px;
   }
 
+  .home-carousel-row {
+    gap: 6px;
+  }
+
   .home-slide--single {
     flex-direction: column;
-    padding: 24px 20px 32px;
+    padding: 24px 20px 28px;
     min-height: unset;
     gap: 16px;
   }
@@ -208,8 +225,8 @@
   }
 
   .carousel-arrow {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     font-size: 1.2rem;
   }
 }

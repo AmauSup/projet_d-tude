@@ -80,6 +80,7 @@ export default function Product({
   onOpenProduct,
 }) {
   const { t } = useI18n();
+  const [quantity, setQuantity] = useState(1);
   const isAvailable = useMemo(() => product?.availableStock > 0, [product]);
 
   const images = useMemo(() => {
@@ -127,11 +128,22 @@ export default function Product({
           </article>
 
           <div className="product-cta">
+            <input
+              className="input"
+              type="number"
+              min="1"
+              max={product.availableStock || 1}
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, Math.min(Number(e.target.value), product.availableStock || 1)))}
+              disabled={!isAvailable}
+              style={{ width: 72 }}
+              aria-label="Quantité"
+            />
             <button
               className="btn btn--primary"
               type="button"
               disabled={!isAvailable}
-              onClick={() => onAddToCart(product.id, 1)}
+              onClick={() => onAddToCart(product.id, quantity)}
             >
               {isAvailable ? t('product.addToCart') : t('product.outOfStock')}
             </button>
@@ -140,7 +152,7 @@ export default function Product({
               className="btn btn--secondary"
               type="button"
               disabled={!isAvailable}
-              onClick={() => onBuyNow(product.id)}
+              onClick={() => { onAddToCart(product.id, quantity); onBuyNow(product.id); }}
             >
               {t('product.buyNow')}
             </button>

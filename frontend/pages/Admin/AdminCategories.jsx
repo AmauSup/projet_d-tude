@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService.js';
+import { createEventSource } from '../../services/apiClient.js';
 
-const EMPTY_FORM = { name: '', description: '', image_url: '', order_index: 0 };
+const EMPTY_FORM = { name: '', description: '', image_url: '' };
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
@@ -23,6 +24,18 @@ export default function AdminCategories() {
 
   useEffect(() => { load(); }, []);
 
+  // Rechargement silencieux en temps réel.
+  // Quand un autre admin (ou un autre onglet) modifie les catégories,
+  // le backend émet un événement SSE → on recharge sans spinner de chargement.
+  // Le cleanup (es.close()) est essentiel pour éviter les fuites mémoire.
+  useEffect(() => {
+    const es = createEventSource('/pg/events/home');
+    es.onmessage = () => {
+      adminService.listCategories().then(setCategories).catch(() => {});
+    };
+    return () => es.close();
+  }, []);
+
   const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const openCreate = () => {
@@ -38,7 +51,6 @@ export default function AdminCategories() {
       name: cat.name || '',
       description: cat.description || '',
       image_url: cat.image_url || '',
-      order_index: cat.order_index ?? 0,
     });
     setFormError('');
     setShowForm(true);
@@ -55,7 +67,6 @@ export default function AdminCategories() {
           name: form.name.trim(),
           description: form.description.trim(),
           image_url: form.image_url.trim(),
-          order_index: Number(form.order_index) || 0,
         });
         setFeedback(`Catégorie "${form.name}" mise à jour.`);
       } else {
@@ -63,7 +74,7 @@ export default function AdminCategories() {
           name: form.name.trim(),
           description: form.description.trim(),
           image_url: form.image_url.trim(),
-          order_index: Number(form.order_index) || 0,
+          order_index: categories.length,
         });
         setFeedback(`Catégorie "${form.name}" créée.`);
       }
@@ -77,6 +88,22 @@ export default function AdminCategories() {
     }
   };
 
+  // Bascule la visibilité de la catégorie sur la page d'accueil.
+  // Optimistic update : met à jour l'affichage local immédiatement sans attendre l'API,
+  // appel API en arrière-plan. Si l'API échoue, on recharge depuis le serveur pour
+  // remettre l'état à jour et éviter un affichage incohérent avec la réalité de la base.
+  const handleToggleVisible = async (cat) => {
+    const newVisible = cat.visible === false;
+    setCategories((prev) => prev.map((c) => c.id === cat.id ? { ...c, visible: newVisible } : c));
+    try {
+      await adminService.setCategoryVisible(cat.id, newVisible);
+      setFeedback(`Catégorie "${cat.name}" ${newVisible ? 'affichée' : 'masquée'} sur l'accueil.`);
+    } catch (e) {
+      setFeedback(`Erreur : ${e.message}`);
+      load();
+    }
+  };
+
   const handleDelete = async (cat) => {
     if (!globalThis.confirm(`Supprimer la catégorie "${cat.name}" ? Cette action est irréversible. Les produits liés doivent être réaffectés au préalable.`)) return;
     try {
@@ -85,6 +112,27 @@ export default function AdminCategories() {
       load();
     } catch (err) {
       setFeedback(`Erreur : ${err.message}`);
+    }
+  };
+
+  // Réordonne les catégories en échangeant deux éléments adjacents.
+  // Trie d'abord par order_index pour garantir un ordre stable avant l'échange,
+  // fait l'échange, réassigne des index 0,1,2... pour éviter les doublons ou les trous,
+  // puis sauvegarde tous les order_index en parallèle (Promise.all) pour limiter la latence.
+  const handleMove = async (cat, dir) => {
+    const list = [...categories].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const idx = list.findIndex((c) => c.id === cat.id);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const reordered = [...list];
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+    const withIndices = reordered.map((c, i) => ({ ...c, order_index: i }));
+    setCategories(withIndices);
+    try {
+      await Promise.all(withIndices.map((c) => adminService.updateCategory(c.id, { order_index: c.order_index })));
+    } catch (e) {
+      setFeedback(`Erreur : ${e.message}`);
+      load();
     }
   };
 
@@ -156,17 +204,6 @@ export default function AdminCategories() {
               )}
             </div>
 
-            <div>
-              <label className="form-label" htmlFor="cat-order">Ordre d'affichage</label>
-              <input
-                id="cat-order"
-                className="input"
-                type="number"
-                min="0"
-                value={form.order_index}
-                onChange={(e) => set('order_index', e.target.value)}
-              />
-            </div>
           </div>
 
           <div className="inline-actions">
@@ -181,23 +218,45 @@ export default function AdminCategories() {
           <table className="admin-table">
             <thead>
               <tr>
+                <th>Position</th>
                 <th>Image</th>
                 <th>Nom</th>
                 <th>Slug</th>
                 <th>Description</th>
-                <th>Ordre</th>
+                <th>Accueil</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 24 }} className="helper-text">
+                  <td colSpan={7} style={{ textAlign: 'center', padding: 24 }} className="helper-text">
                     Aucune catégorie.
                   </td>
                 </tr>
-              ) : sorted.map((cat) => (
+              ) : sorted.map((cat, idx) => (
                 <tr key={cat.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <div className="inline-actions" style={{ gap: 2 }}>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        style={{ fontSize: '0.8rem', padding: '2px 7px', lineHeight: 1 }}
+                        disabled={idx === 0}
+                        onClick={() => handleMove(cat, 'up')}
+                        aria-label="Monter"
+                      >▲</button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        style={{ fontSize: '0.8rem', padding: '2px 7px', lineHeight: 1 }}
+                        disabled={idx === sorted.length - 1}
+                        onClick={() => handleMove(cat, 'down')}
+                        aria-label="Descendre"
+                      >▼</button>
+                      <span className="helper-text" style={{ fontSize: '0.78rem', minWidth: 18, textAlign: 'center' }}>{idx + 1}</span>
+                    </div>
+                  </td>
                   <td>
                     {cat.image_url ? (
                       <img
@@ -215,7 +274,16 @@ export default function AdminCategories() {
                   <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {cat.description || <span className="helper-text">—</span>}
                   </td>
-                  <td>{cat.order_index ?? 0}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`btn ${cat.visible === false ? 'btn--danger' : 'btn--secondary'}`}
+                      style={{ fontSize: '0.8rem', padding: '3px 10px', whiteSpace: 'nowrap' }}
+                      onClick={() => handleToggleVisible(cat)}
+                    >
+                      {cat.visible === false ? 'Masqué' : 'Visible'}
+                    </button>
+                  </td>
                   <td>
                     <div className="inline-actions" style={{ gap: 6 }}>
                       <button type="button" className="btn btn--secondary" style={{ fontSize: '0.8rem', padding: '3px 10px' }} onClick={() => openEdit(cat)}>

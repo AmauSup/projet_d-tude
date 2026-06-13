@@ -14,11 +14,7 @@ export const supportService = {
     }
   },
 
-  async escalateChatbot({ email, transcript }) {
-    try {
-      await apiClient.post('/pg/support/chatbot-escalate', { email, transcript });
-    } catch {
-      // Silencieux — l'escalade est best-effort
-    }
+  async escalateChatbot({ email, name, transcript }) {
+    return apiClient.post('/pg/support/chatbot-escalate', { email, name, transcript });
   },
 };

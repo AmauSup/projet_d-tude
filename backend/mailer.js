@@ -136,4 +136,22 @@ async function sendAdminOtp(user, otp) {
   });
 }
 
-module.exports = { sendWelcome, sendEmailVerification, sendOrderConfirmation, sendPasswordReset, sendAdminOtp };
+async function sendAdminReply(to, subject, replyText) {
+  await sendMail({
+    to,
+    subject: subject ? `Re: ${subject}` : 'Réponse de l\'équipe Althea Systems',
+    html: `
+      <h2>Réponse à votre demande de support</h2>
+      <p>Bonjour,</p>
+      <p>Notre équipe a répondu à votre message :</p>
+      <blockquote style="border-left:4px solid #0284c7;margin:12px 0;padding:8px 16px;background:#f0f9ff;color:#0f172a;">
+        ${replyText.replaceAll('\n', '<br>')}
+      </blockquote>
+      <p>Si vous avez d'autres questions, n'hésitez pas à nous recontacter.</p>
+      <p>— L'équipe Althea Systems</p>
+    `,
+    text: replyText,
+  });
+}
+
+module.exports = { sendWelcome, sendEmailVerification, sendOrderConfirmation, sendPasswordReset, sendAdminOtp, sendAdminReply };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { adminService } from '../../services/adminService.js';
+import { createEventSource } from '../../services/apiClient.js';
 
 const EMPTY_FORM = {
   name: '', description: '', characteristics: '',
@@ -312,6 +313,14 @@ export default function AdminProducts() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const es = createEventSource('/pg/events/home');
+    es.onmessage = () => {
+      adminService.listProducts().then(setProducts).catch(() => {});
+    };
+    return () => es.close();
+  }, []);
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));

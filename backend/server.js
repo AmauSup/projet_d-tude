@@ -7,15 +7,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 
-const routes = require('./routes');
 const mailer = require('./mailer');
 
 const app = express();
+// Désactive l'en-tête "X-Powered-By: Express" pour ne pas exposer la technologie utilisée.
+// Un attaquant qui sait qu'on utilise Express peut cibler des failles spécifiques à ce framework.
 app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
 const ALLOWED_ORIGINS = new Set([
   process.env.FRONTEND_URL || 'http://localhost:5173',
-  process.env.ADMIN_URL || 'http://localhost:5174',
 ]);
 app.use(cors({
   origin: (origin, cb) => {
@@ -33,7 +33,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting simple (in-memory, sans dépendance supplémentaire)
+// Rate limiter maison (sans librairie externe).
+// Stocke en mémoire le nombre de requêtes par IP sur une fenêtre de temps.
+// Si la limite est dépassée → HTTP 429 (Too Many Requests).
+// Attention : se réinitialise au redémarrage du serveur (pas persistant).
+// Pour une production robuste, il faudrait utiliser Redis ou une librairie comme express-rate-limit.
 const rateLimitMap = new Map();
 function rateLimit(windowMs, max) {
   return (req, res, next) => {
@@ -53,6 +57,10 @@ function rateLimit(windowMs, max) {
   };
 }
 
+// Pool de connexions PostgreSQL (Neon en production, local en dev).
+// Un pool réutilise des connexions ouvertes plutôt que d'en créer une par requête,
+// ce qui améliore significativement les performances sous charge.
+// SSL activé uniquement si l'URL contient "neon.tech" (cloud) pour éviter les erreurs en dev local.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes('neon.tech')
@@ -63,17 +71,34 @@ const pool = new Pool({
 const JWT_SECRET = process.env.JWT_SECRET || 'althea-dev-secret-change-in-prod';
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '1d';
 
-// Expose pool et jwt pour les routes modulaires
-app.locals.pool = pool;
-app.locals.jwtSecret = JWT_SECRET;
-app.locals.jwtExpires = JWT_EXPIRES;
-
-// Les migrations de schéma sont gérées par les fichiers SQL dans /database/
-// Exécuter 003_postgres_schema.sql puis 004_incremental_migration.sql puis 005_consolidation.sql
-// avant le premier démarrage. Les migrations auto sont supprimées pour éviter les effets de bord.
 pool.query('SELECT 1').then(() => console.info('[DB] Connexion PostgreSQL établie.')).catch((e) => console.error('[DB] Connexion échouée :', e.message));
 
+// ── SYSTÈME SSE (Server-Sent Events) ─────────────────────────────────────────
+// sseClients : ensemble de toutes les connexions SSE ouvertes (une par onglet navigateur).
+// broadcastHomeUpdate() : envoie un événement JSON à tous les clients connectés
+// dès qu'une modification admin affecte la page d'accueil (carrousel, catégories, produits...).
+// Côté frontend, App.jsx reçoit cet événement et recharge les données storefront.
+// Si un client est déconnecté (onglet fermé), l'écriture échoue → on le retire du Set.
+const sseClients = new Set();
+
+function broadcastHomeUpdate() {
+  const payload = `data: ${JSON.stringify({ type: 'home-updated', ts: Date.now() })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(payload); } catch { sseClients.delete(client); }
+  }
+}
+
 // Migration incrémentale : ajout email_verified + table de tokens de vérification + type message chatbot
+pool.query(`
+  CREATE TABLE IF NOT EXISTS password_reset_token (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token      TEXT    NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ
+  );
+`).catch((e) => console.warn('[DB migration password_reset_token]', e.message));
+
 pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE;
   CREATE TABLE IF NOT EXISTS email_verification_token (
@@ -85,6 +110,40 @@ pool.query(`
   );
   ALTER TABLE contact_message ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'contact';
 `).catch((e) => console.warn('[DB migration email_verified]', e.message));
+
+// Migration : colonnes visible pour carousel et catégories
+pool.query(`
+  ALTER TABLE carousel  ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE;
+  ALTER TABLE category  ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE;
+`).catch((e) => console.warn('[DB migration visible]', e.message));
+
+// Migration : table FAQ chatbot + seed initial
+pool.query(`
+  CREATE TABLE IF NOT EXISTS chatbot_faq (
+    id SERIAL PRIMARY KEY,
+    question TEXT NOT NULL,
+    keywords TEXT[] NOT NULL DEFAULT '{}',
+    answer TEXT NOT NULL,
+    order_index INT DEFAULT 0
+  );
+`).then(async () => {
+  const { rows } = await pool.query('SELECT COUNT(*) FROM chatbot_faq');
+  if (rows[0].count !== '0') return;
+  await pool.query(`
+    INSERT INTO chatbot_faq (question, keywords, answer, order_index) VALUES
+    ('Mot de passe oublié',        ARRAY['mot de passe','password','mdp','oublié','réinitialiser','reset'],                                         'Pour réinitialiser votre mot de passe, cliquez sur "Mot de passe oublié ?" sur la page de connexion. Vous recevrez un e-mail avec un lien de réinitialisation valable 1 heure.', 0),
+    ('Gérer mes adresses',         ARRAY['adresse','livraison','facturation','modifier adresse','changer adresse'],                                  'Vous pouvez gérer vos adresses depuis Mon compte → Mes adresses. Vous pouvez ajouter, modifier ou supprimer vos adresses de livraison et de facturation.', 1),
+    ('Suivi de commande',          ARRAY['commande','suivi','statut','où est','livraison','expédié'],                                                'Consultez le statut de vos commandes dans Mon compte → Mes commandes. Chaque commande affiche son statut : En préparation, Confirmée, Expédiée ou Livrée.', 2),
+    ('Télécharger une facture',    ARRAY['facture','pdf','télécharger','reçu','document'],                                                           'Vous pouvez télécharger la facture PDF de chaque commande depuis Mon compte → Mes commandes → Voir le détail → Télécharger la facture PDF.', 3),
+    ('Retour ou remboursement',    ARRAY['retour','rembours','annul','retourner'],                                                                   'Pour une demande de retour ou de remboursement, veuillez contacter notre service client via la page Contact en précisant votre numéro de commande.', 4),
+    ('Paiement par carte',         ARRAY['paiement','carte','moyen de paiement','payer','stripe','paypal'],                                          'Le paiement s''effectue par carte bancaire lors du checkout. En mode démo, vous pouvez simuler un paiement sans carte réelle. Les données ne sont jamais stockées en clair.', 5),
+    ('Créer un compte',            ARRAY['compte','inscription','créer','register','s''inscrire'],                                                   'Pour créer un compte, cliquez sur "S''inscrire" dans le menu ou sur la page de connexion. Vous aurez besoin d''un e-mail professionnel et d''un mot de passe fort (8 caractères min.).', 6),
+    ('Disponibilité d''un produit',ARRAY['stock','rupture','disponible','indisponible'],                                                             'Les produits en rupture de stock sont affichés en bas de la liste avec la mention "En rupture de stock". Vous pouvez suivre les disponibilités sur chaque fiche produit.', 7),
+    ('Contacter le support',       ARRAY['contact','support','aide','assistance','humain'],                                                          'Vous pouvez nous contacter via la page Contact (menu → Contact). Notre équipe traite toutes les demandes sous 24h ouvrées.', 8),
+    ('Parcourir le catalogue',     ARRAY['catégorie','catalogue','produit','chercher','trouver'],                                                    'Utilisez la barre de recherche en haut de la page ou parcourez le catalogue par catégorie : Diagnostic, Monitoring, Stérilisation, Imagerie, Consommables, Mobilier.', 9)
+  `);
+  console.info('[DB] chatbot_faq seeded (10 entrées).');
+}).catch((e) => console.warn('[DB migration chatbot_faq]', e.message));
 
 // Migration : table des moyens de paiement enregistrés par les utilisateurs
 pool.query(`
@@ -180,6 +239,10 @@ pool.query(`
   ALTER TABLE carousel ADD COLUMN IF NOT EXISTS cta_label VARCHAR(150) DEFAULT 'Voir la catégorie';
 `).catch((e) => console.warn('[DB migration carousel columns]', e.message));
 
+// Journalise chaque action admin dans la table admin_log.
+// Utilisé pour l'audit et la traçabilité des modifications (qui a fait quoi et quand).
+// Les erreurs d'insertion sont ignorées silencieusement (.catch) pour ne pas bloquer
+// l'action principale : si le log échoue, l'opération admin doit quand même réussir.
 async function logAdmin(adminId, action, target) {
   await pool.query(
     'INSERT INTO admin_log (admin_id, action, target, created_at) VALUES ($1,$2,$3,NOW())',
@@ -188,7 +251,11 @@ async function logAdmin(adminId, action, target) {
 }
 
 
-// Middleware JWT partagé
+// Middleware d'authentification JWT.
+// Extrait le token du header "Authorization: Bearer <token>",
+// le vérifie avec JWT_SECRET, et attache le payload décodé à req.user.
+// Utilisé sur toutes les routes protégées.
+// Retourne 401 si le token est absent, 403 si le token est invalide ou expiré.
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -200,13 +267,12 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Expose pour les routes modulaires
-app.locals.authenticateToken = authenticateToken;
-
 // Statuts de commande valides
 const ORDER_STATUSES = ['En préparation', 'Confirmée', 'Expédiée', 'Livrée', 'Annulée'];
 
-// Middleware admin réutilisable
+// Middleware admin : vérifie que l'utilisateur connecté a le flag is_admin=true.
+// Toujours utilisé APRÈS authenticateToken (qui peuple req.user).
+// Un utilisateur connecté mais non-admin reçoit un 403 Forbidden.
 function requireAdmin(req, res, next) {
   if (!req.user?.is_admin) return res.status(403).json({ message: 'Accès réservé aux administrateurs.' });
   return next();
@@ -215,25 +281,15 @@ function requireAdmin(req, res, next) {
 // Rate limiter admin (plus strict pour les mutations)
 const adminRateLimit = rateLimit(15 * 60 * 1000, 200);
 
-// =====================================================================
-// Routes modulaires legacy (db.json) — DÉSACTIVÉES
-// Toutes les données transitent désormais par PostgreSQL via /api/pg/*
-// Conserver le montage uniquement en mode développement pour diagnostic.
-// =====================================================================
-if (process.env.ENABLE_LEGACY_ROUTES === 'true') {
-  app.use('/api/legacy', routes);
-  console.warn('[Althea] Routes legacy db.json montées sur /api/legacy (ENABLE_LEGACY_ROUTES=true)');
-} else {
-  // Renvoyer 410 Gone sur toute route /api/* non capturée par les routes pg ci-dessous
-  app.use('/api', (req, res, next) => {
-    if (!req.path.startsWith('/pg/')) {
-      return res.status(410).json({
-        message: 'Ces routes ont été migrées vers /api/pg/*. Veuillez mettre à jour vos appels.',
-      });
-    }
-    return next();
-  });
-}
+// Bloque toutes les routes /api/* qui ne commencent pas par /pg/ (anciennes routes supprimées).
+// Retourne 410 Gone pour indiquer que la ressource n'existe plus (différent du 404 "jamais existé").
+// Cela aide les clients à comprendre qu'ils doivent migrer vers les nouvelles routes /api/pg/*.
+app.use('/api', (req, res, next) => {
+  if (!req.path.startsWith('/pg/')) {
+    return res.status(410).json({ message: 'Route non disponible.' });
+  }
+  return next();
+});
 
 // =====================================================================
 // Routes PostgreSQL directes (seules routes actives en production)
@@ -543,7 +599,7 @@ app.get('/api/pg/storefront', async (req, res) => {
         ORDER BY p.created_at DESC
       `, [locale]),
       pool.query(`
-        SELECT c.id, c.slug, c.order_index, c.image_url,
+        SELECT c.id, c.slug, c.order_index, c.image_url, COALESCE(c.visible, true) AS visible,
           COALESCE(NULLIF(ct_loc.name,''), NULLIF(ct_fr.name,''), c.name, '') AS name,
           COALESCE(NULLIF(ct_loc.description,''), NULLIF(ct_fr.description,''), '') AS description
         FROM category c
@@ -551,6 +607,7 @@ app.get('/api/pg/storefront', async (req, res) => {
           AND ct_loc.language_id = (SELECT id FROM language WHERE code = $1 LIMIT 1)
         LEFT JOIN category_translation ct_fr ON ct_fr.category_id = c.id
           AND ct_fr.language_id = (SELECT id FROM language WHERE code = 'fr' LIMIT 1)
+        WHERE COALESCE(c.visible, true) = true
         ORDER BY c.order_index ASC, c.id ASC
       `, [locale]),
     ]);
@@ -559,7 +616,7 @@ app.get('/api/pg/storefront', async (req, res) => {
     try {
       const hcRes = await pool.query('SELECT * FROM homepage_content ORDER BY id LIMIT 1');
       homeContent.fixedMessage = hcRes.rows[0]?.fixed_message || homeContent.fixedMessage;
-      const carRes = await pool.query('SELECT * FROM carousel ORDER BY order_index ASC');
+      const carRes = await pool.query('SELECT * FROM carousel WHERE COALESCE(visible,true)=true ORDER BY order_index ASC');
       homeContent.carousel = carRes.rows;
     } catch (e) {
       console.warn('[storefront] tables optionnelles absentes:', e.message);
@@ -617,6 +674,7 @@ app.post('/api/pg/admin/products', authenticateToken, async (req, res) => {
     }
     await client.query('COMMIT');
     logAdmin(req.user.id, 'create_product', `product:${product.id}`);
+    broadcastHomeUpdate();
     return res.status(201).json({ success: true, product });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -667,6 +725,7 @@ app.put('/api/pg/admin/products/:id', authenticateToken, async (req, res) => {
       );
     }
     await client.query('COMMIT');
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -681,6 +740,7 @@ app.delete('/api/pg/admin/products/:id', authenticateToken, requireAdmin, async 
   try {
     await pool.query('UPDATE product SET deleted_at = NOW() WHERE id = $1', [req.params.id]);
     logAdmin(req.user.id, 'delete_product', `product:${req.params.id}`);
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin delete product]', err.message);
@@ -1133,17 +1193,55 @@ app.get('/api/pg/admin/stats', authenticateToken, requireAdmin, adminRateLimit, 
   }
 });
 
-// Escalade chatbot vers agent humain — sauvegarde la conversation dans contact_message
-app.post('/api/pg/support/chatbot-escalate', async (req, res) => {
-  const { email, transcript } = req.body;
-  if (!transcript) return res.status(400).json({ message: 'Transcription requise.' });
+// FAQ chatbot — publique
+app.get('/api/pg/chatbot/faq', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `INSERT INTO contact_message (email, subject, message, message_type, created_at)
-       VALUES ($1, $2, $3, 'chatbot', NOW()) RETURNING id`,
-      [email || 'anonyme@chatbot', 'Escalade chatbot — demande agent humain', transcript],
+      'SELECT id, question, keywords, answer FROM chatbot_faq ORDER BY order_index ASC, id ASC',
     );
-    return res.status(201).json({ success: true, id: rows[0].id });
+    return res.json({ success: true, faq: rows });
+  } catch (err) {
+    console.error('[chatbot faq]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Escalade chatbot — crée un message de support + archive la conversation
+app.post('/api/pg/support/chatbot-escalate', async (req, res) => {
+  const { email, transcript, name } = req.body;
+  if (!transcript) return res.status(400).json({ message: 'Transcription requise.' });
+  const resolvedEmail = email || 'anonyme@chatbot';
+  const resolvedName = name || 'Visiteur (chatbot)';
+  try {
+    // 1. Crée le message de support visible dans l'admin
+    let contactId = null;
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO contact_message (email, name, subject, message, message_type, created_at)
+         VALUES ($1, $2, $3, $4, 'chatbot', NOW()) RETURNING id`,
+        [resolvedEmail, resolvedName, 'Demande de support via chatbot', transcript],
+      );
+      contactId = rows[0].id;
+    } catch {
+      const { rows } = await pool.query(
+        `INSERT INTO contact_message (email, subject, message, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id`,
+        [resolvedEmail, 'Demande de support via chatbot', transcript],
+      );
+      contactId = rows[0].id;
+    }
+
+    // 2. Archive la conversation dans chatbot_conversation
+    try {
+      await pool.query(
+        `INSERT INTO chatbot_conversation (email, name, transcript, contact_message_id, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [resolvedEmail, resolvedName, transcript, contactId],
+      );
+    } catch {
+      // La table n'existe pas encore — non bloquant
+    }
+
+    return res.status(201).json({ success: true, id: contactId });
   } catch (err) {
     console.error('[chatbot-escalate]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
@@ -1172,6 +1270,11 @@ app.patch('/api/pg/admin/messages/:id', authenticateToken, async (req, res) => {
   const { status, admin_reply } = req.body;
   if (!status) return res.status(400).json({ message: 'Statut requis.' });
   try {
+    // Fetch email + subject before update so we can send the reply email
+    const { rows: existing } = await pool.query(
+      'SELECT email, subject FROM contact_message WHERE id=$1',
+      [req.params.id],
+    );
     // admin_reply column may not exist yet; graceful fallback
     try {
       await pool.query(
@@ -1182,9 +1285,31 @@ app.patch('/api/pg/admin/messages/:id', authenticateToken, async (req, res) => {
       console.warn('[admin message update] admin_reply column missing, falling back:', colErr.message);
       await pool.query('UPDATE contact_message SET status=$1 WHERE id=$2', [status, req.params.id]);
     }
-    return res.json({ success: true });
+
+    let email_sent = false;
+    if (status === 'replied' && admin_reply && existing[0]?.email) {
+      try {
+        await mailer.sendAdminReply(existing[0].email, existing[0].subject, admin_reply);
+        email_sent = true;
+      } catch (mailErr) {
+        console.warn('[admin message update] email send failed:', mailErr.message);
+      }
+    }
+
+    return res.json({ success: true, email_sent });
   } catch (err) {
     console.error('[admin message update]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.delete('/api/pg/admin/messages/:id', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+  try {
+    await pool.query('DELETE FROM contact_message WHERE id=$1', [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[admin message delete]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
@@ -1281,17 +1406,43 @@ app.post('/api/pg/admin/categories', authenticateToken, async (req, res) => {
 
 app.put('/api/pg/admin/categories/:id', authenticateToken, async (req, res) => {
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
-  const { name, description, image_url, order_index } = req.body;
-  if (!name) return res.status(400).json({ message: 'Nom requis.' });
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const { name, description, image_url, order_index, visible } = req.body;
+  const setClauses = [];
+  const values = [];
+  const add = (col, val) => { setClauses.push(`${col}=$${values.push(val)}`); };
+  if (name !== undefined) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    add('name', name); add('slug', slug);
+  }
+  if (description !== undefined) add('description', description || '');
+  if (image_url   !== undefined) add('image_url',   image_url  || '');
+  if (order_index !== undefined) add('order_index', order_index ?? 0);
+  if (visible     !== undefined) add('visible',     visible);
+  if (setClauses.length === 0) return res.status(400).json({ message: 'Aucun champ à mettre à jour.' });
+  values.push(req.params.id);
   try {
     await pool.query(
-      'UPDATE category SET name=$1, slug=$2, description=$3, image_url=$4, order_index=$5, updated_at=NOW() WHERE id=$6',
-      [name, slug, description || '', image_url || '', order_index || 0, req.params.id],
+      `UPDATE category SET ${setClauses.join(', ')}, updated_at=NOW() WHERE id=$${values.length}`,
+      values,
     );
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin update category]', err.message);
+    return res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+app.patch('/api/pg/admin/carousel/:id/visible', authenticateToken, async (req, res) => {
+  if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
+  const { visible } = req.body;
+  if (visible === undefined) return res.status(400).json({ message: 'Champ visible requis.' });
+  try {
+    await pool.query('UPDATE carousel SET visible=$1 WHERE id=$2', [visible, req.params.id]);
+    broadcastHomeUpdate();
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[admin carousel visible]', err.message);
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
@@ -1305,6 +1456,18 @@ app.delete('/api/pg/admin/categories/:id', authenticateToken, async (req, res) =
     console.error('[admin delete category]', err.message);
     return res.status(500).json({ message: 'Erreur serveur. Vérifiez qu\'aucun produit n\'est lié.' });
   }
+});
+
+// SSE — flux temps réel pour la page d'accueil (public, pas d'auth)
+app.get('/api/pg/events/home', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // désactive le buffering Nginx si présent
+  res.flushHeaders();
+  res.write(': connected\n\n'); // commentaire SSE pour garder la connexion vivante
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
 });
 
 // --- ADMIN HOMEPAGE : contenu + carrousel ---
@@ -1331,6 +1494,7 @@ app.put('/api/pg/admin/homepage', authenticateToken, async (req, res) => {
     } else {
       await pool.query('INSERT INTO homepage_content (fixed_message) VALUES ($1)', [fixed_message]);
     }
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin homepage put]', err.message);
@@ -1346,6 +1510,7 @@ app.post('/api/pg/admin/carousel', authenticateToken, async (req, res) => {
       'INSERT INTO carousel (title, subtitle, image_url, link_url, order_index, badge, cta_label) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
       [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0, badge || '', cta_label || 'Voir la catégorie'],
     );
+    broadcastHomeUpdate();
     return res.status(201).json({ success: true, slide: rows[0] });
   } catch (err) {
     console.error('[admin carousel add]', err.message);
@@ -1361,6 +1526,7 @@ app.put('/api/pg/admin/carousel/:id', authenticateToken, async (req, res) => {
       'UPDATE carousel SET title=$1, subtitle=$2, image_url=$3, link_url=$4, order_index=$5, badge=$6, cta_label=$7 WHERE id=$8',
       [title || '', subtitle || '', image_url || '', link_url || '', order_index || 0, badge || '', cta_label || 'Voir la catégorie', req.params.id],
     );
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin carousel update]', err.message);
@@ -1372,6 +1538,7 @@ app.delete('/api/pg/admin/carousel/:id', authenticateToken, async (req, res) => 
   if (!req.user.is_admin) return res.status(403).json({ message: 'Accès refusé.' });
   try {
     await pool.query('DELETE FROM carousel WHERE id=$1', [req.params.id]);
+    broadcastHomeUpdate();
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin carousel delete]', err.message);
@@ -1439,9 +1606,11 @@ app.put('/api/pg/admin/settings', authenticateToken, async (req, res) => {
 app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email requis.' });
-  // Toujours répondre OK pour ne pas divulguer l'existence du compte
   try {
-    const { rows } = await pool.query('SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL', [email.toLowerCase().trim()]);
+    const { rows } = await pool.query(
+      'SELECT id, first_name, email FROM users WHERE email=$1 AND deleted_at IS NULL',
+      [email.toLowerCase().trim()],
+    );
     if (rows[0]) {
       const token = require('node:crypto').randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 60 * 60 * 1000); // 1h
@@ -1449,7 +1618,8 @@ app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (r
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`)
+        .catch((e) => console.warn('[mailer reset]', e.message));
     }
   } catch (err) {
     console.error('[forgot-password]', err.message);
@@ -1459,11 +1629,13 @@ app.post('/api/pg/auth/forgot-password', rateLimit(15 * 60 * 1000, 10), async (r
 
 // Alias pour la compatibilité avec le frontend
 app.post('/api/pg/auth/request-reset-password', rateLimit(15 * 60 * 1000, 10), async (req, res) => {
-  req.url = '/api/pg/auth/forgot-password';
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email requis.' });
   try {
-    const { rows } = await pool.query('SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL', [email.toLowerCase().trim()]);
+    const { rows } = await pool.query(
+      'SELECT id, first_name, email FROM users WHERE email=$1 AND deleted_at IS NULL',
+      [email.toLowerCase().trim()],
+    );
     if (rows[0]) {
       const token = require('node:crypto').randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 60 * 60 * 1000);
@@ -1471,7 +1643,8 @@ app.post('/api/pg/auth/request-reset-password', rateLimit(15 * 60 * 1000, 10), a
         'INSERT INTO password_reset_token (user_id, token, expires_at) VALUES ($1,$2,$3)',
         [rows[0].id, token, expires],
       );
-      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`).catch((e) => console.warn('[mailer reset]', e.message));
+      mailer.sendPasswordReset(rows[0], `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`)
+        .catch((e) => console.warn('[mailer reset]', e.message));
     }
   } catch (err) {
     console.error('[request-reset-password]', err.message);

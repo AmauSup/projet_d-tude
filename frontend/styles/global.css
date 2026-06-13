@@ -166,6 +166,17 @@ h3 {
   border-color: #22d3ee;
 }
 
+.btn--danger {
+  color: #ffffff;
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  border: 1px solid #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+.btn--danger:hover {
+  background: linear-gradient(135deg, #991b1b, #b91c1c);
+}
+
 .input,
 .select,
 .textarea {
@@ -410,6 +421,15 @@ h3 {
 [data-theme="dark"] .btn--secondary:hover {
   background: #0c3d5f;
   border-color: #0284c7;
+}
+
+[data-theme="dark"] .btn--danger {
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c);
+  border-color: #b91c1c;
+}
+
+[data-theme="dark"] .btn--danger:hover {
+  background: linear-gradient(135deg, #991b1b, #dc2626);
 }
 
 [data-theme="dark"] .input,

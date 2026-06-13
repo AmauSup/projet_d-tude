@@ -64,14 +64,26 @@ export default function AdminSupport() {
     if (!selected) return;
     setSaving(true);
     try {
-      await adminService.updateMessageStatus(selected.id, 'replied', replyText);
+      const result = await adminService.updateMessageStatus(selected.id, 'replied', replyText);
       setMessages((prev) => prev.map((m) => m.id === selected.id ? { ...m, status: 'replied', admin_reply: replyText } : m));
       setSelected((prev) => prev ? { ...prev, status: 'replied', admin_reply: replyText } : prev);
-      setFeedback('Réponse sauvegardée.');
+      setFeedback(result?.email_sent ? 'Réponse sauvegardée et e-mail envoyé.' : 'Réponse sauvegardée.');
     } catch (e) {
       setFeedback(`Erreur : ${e.message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Supprimer définitivement ce message ?')) return;
+    try {
+      await adminService.deleteMessage(id);
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+      if (selected?.id === id) setSelected(null);
+      setFeedback('Message supprimé.');
+    } catch (e) {
+      setFeedback(`Erreur : ${e.message}`);
     }
   };
 
@@ -125,7 +137,7 @@ export default function AdminSupport() {
       </div>
 
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.3fr' : '1fr', gap: 16 }}>
+        <div className="stack">
           {/* Liste des messages */}
           <div className="admin-table-wrapper">
             <table className="admin-table">
@@ -144,7 +156,8 @@ export default function AdminSupport() {
                 ) : paginated.map((msg) => (
                   <tr
                     key={msg.id}
-                    style={{ cursor: 'pointer', fontWeight: msg.status === 'new' ? 700 : 400, background: selected?.id === msg.id ? 'var(--color-primary-50, #e0f2fe)' : '' }}
+                    className={selected?.id === msg.id ? 'is-selected' : ''}
+                    style={{ cursor: 'pointer', fontWeight: msg.status === 'new' ? 700 : 400 }}
                     onClick={() => openMessage(msg)}
                   >
                     <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>{formatDate(msg.created_at)}</td>
@@ -159,16 +172,26 @@ export default function AdminSupport() {
                       </span>
                     </td>
                     <td>
-                      {msg.status !== 'closed' && (
+                      <div className="inline-actions" style={{ gap: 4 }}>
+                        {msg.status !== 'closed' && (
+                          <button
+                            type="button"
+                            className="btn btn--secondary"
+                            style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+                            onClick={(e) => { e.stopPropagation(); handleClose(msg.id); }}
+                          >
+                            Fermer
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="btn btn--secondary"
+                          className="btn btn--danger"
                           style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-                          onClick={(e) => { e.stopPropagation(); handleClose(msg.id); }}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(msg.id); }}
                         >
-                          Fermer
+                          Supprimer
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,7 +223,7 @@ export default function AdminSupport() {
                 <div style={{ gridColumn: '1 / -1' }}><span className="helper-text">Reçu le :</span> {formatDate(selected.created_at)}</div>
               </div>
 
-              <div className="panel" style={{ background: '#f8fafc', padding: 12, borderRadius: 6 }}>
+              <div className="panel admin-message-body">
                 <p className="helper-text" style={{ marginBottom: 4 }}>Message :</p>
                 <p style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.9rem' }}>{selected.message}</p>
               </div>
@@ -222,6 +245,7 @@ export default function AdminSupport() {
                   {selected.status !== 'closed' && (
                     <button type="button" className="btn btn--secondary" onClick={() => handleClose(selected.id)}>Marquer fermé</button>
                   )}
+                  <button type="button" className="btn btn--danger" onClick={() => handleDelete(selected.id)}>Supprimer</button>
                 </div>
               </div>
             </div>

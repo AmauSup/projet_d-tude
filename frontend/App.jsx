@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './components/Header.jsx';
@@ -61,7 +61,7 @@ import {
 import { authService } from './services/authService.js';
 import { storefrontService } from './services/storefrontService.js';
 import { checkoutService } from './services/checkoutService.js';
-import { apiClient, persistAuthToken } from './services/apiClient.js';
+import { apiClient, createEventSource, persistAuthToken } from './services/apiClient.js';
 import { adminService } from './services/adminService.js';
 import { useI18n } from './contexts/I18nContext.jsx';
 import Chatbot from './components/Chatbot/Chatbot.jsx';
@@ -206,6 +206,22 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
 
+  // Mises à jour temps réel de la page d'accueil via SSE (admin → tous les visiteurs)
+  const liveLocale = useRef(locale);
+  useEffect(() => { liveLocale.current = locale; }, [locale]);
+  useEffect(() => {
+    const es = createEventSource('/pg/events/home');
+    es.onmessage = () => {
+      storefrontService.getInitialData(liveLocale.current).then((data) => {
+        if (data.products.length > 0) setProducts(data.products);
+        if (data.categories.length > 0) setCategories(data.categories);
+        if (data.homeContent) setHomeContent(data.homeContent);
+      }).catch(() => {});
+    };
+    return () => es.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Restaurer les commandes depuis le backend si l'utilisateur est déjà connecté (refresh page)
   useEffect(() => {
     if (!session.isAuthenticated) return;
@@ -335,6 +351,11 @@ export default function App() {
     }
     try {
       const result = await authService.login({ email, password, rememberMe });
+      // Admin avec 2FA : rediriger vers la page de vérification OTP
+      if (result.requires_2fa) {
+        setPendingAdmin2FA({ userId: result.user_id, rememberMe });
+        return { success: true, requires_2fa: true };
+      }
       const role = result.userRole || (result.user?.is_admin ? 'admin' : 'customer');
       // flushSync : force le commit de la session AVANT que Login.jsx appelle onNavigate,
       // sinon RequireAuth voit encore isAuthenticated=false et redirige vers /login.
@@ -685,6 +706,7 @@ export default function App() {
                 products={sortProductsForCategory(products)}
                 onSelectCategory={handleCategoryNavigation}
                 onOpenProduct={handleProductNavigation}
+                onAddToCart={handleAddToCart}
               />
             }
           />
@@ -699,6 +721,7 @@ export default function App() {
                 products={categoryProducts}
                 onSelectCategory={handleCategoryNavigation}
                 onOpenProduct={handleProductNavigation}
+                onAddToCart={handleAddToCart}
               />
             }
           />

@@ -53,42 +53,52 @@ function Carousel({ slides, onOpenCategory }) {
       aria-roledescription="carrousel"
       aria-label="Promotions"
     >
-      <div className="home-slide home-slide--single">
-        {slide.imageUrl && (
-          <img className="home-slide__img" src={slide.imageUrl} alt="" aria-hidden="true" />
-        )}
-        <div className="home-slide__content">
-          <span className="badge">{slide.badge}</span>
-          <h3>{slide.title}</h3>
-          <p>{slide.text}</p>
-          <button
-            className="btn btn--secondary"
-            type="button"
-            onClick={() => onOpenCategory(slide.categorySlug)}
-          >
-            {slide.ctaLabel}
-          </button>
+      <div className="home-carousel-row">
+        {/* Flèche gauche */}
+        {slides.length > 1 ? (
+          <button type="button" className="carousel-arrow" onClick={prev} aria-label="Diapositive précédente">‹</button>
+        ) : null}
+
+        {/* Contenu de la diapositive */}
+        <div className="home-slide home-slide--single">
+          {slide.imageUrl && (
+            <img className="home-slide__img" src={slide.imageUrl} alt="" aria-hidden="true" />
+          )}
+          <div className="home-slide__content">
+            <span className="badge">{slide.badge}</span>
+            <h3>{slide.title}</h3>
+            <p>{slide.text}</p>
+            <button
+              className="btn btn--secondary"
+              type="button"
+              onClick={() => onOpenCategory(slide.categorySlug)}
+            >
+              {slide.ctaLabel}
+            </button>
+          </div>
         </div>
+
+        {/* Flèche droite */}
+        {slides.length > 1 ? (
+          <button type="button" className="carousel-arrow" onClick={next} aria-label="Diapositive suivante">›</button>
+        ) : null}
       </div>
 
+      {/* Points de navigation */}
       {slides.length > 1 && (
-        <>
-          <button type="button" className="carousel-arrow carousel-arrow--prev" onClick={prev} aria-label="Diapositive précédente">‹</button>
-          <button type="button" className="carousel-arrow carousel-arrow--next" onClick={next} aria-label="Diapositive suivante">›</button>
-          <div className="carousel-dots" role="tablist" aria-label="Diapositives">
-            {slides.map((s, i) => (
-              <button
-                key={s.id}
-                type="button"
-                role="tab"
-                aria-selected={i === current}
-                aria-label={`Diapositive ${i + 1}`}
-                className={`carousel-dot ${i === current ? 'is-active' : ''}`}
-                onClick={() => setCurrent(i)}
-              />
-            ))}
-          </div>
-        </>
+        <div className="carousel-dots" role="tablist" aria-label="Diapositives">
+          {slides.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={i === current}
+              aria-label={`Diapositive ${i + 1}`}
+              className={`carousel-dot ${i === current ? 'is-active' : ''}`}
+              onClick={() => setCurrent(i)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -103,6 +113,7 @@ Home.propTypes = {
   featuredProducts: PropTypes.array,
   onOpenCategory: PropTypes.func.isRequired,
   onOpenProduct: PropTypes.func.isRequired,
+  onNavigate: PropTypes.func.isRequired,
 };
 
 export default function Home({
@@ -111,6 +122,7 @@ export default function Home({
   featuredProducts = [],
   onOpenCategory,
   onOpenProduct,
+  onNavigate,
 }) {
   const { t } = useI18n();
 
@@ -128,6 +140,12 @@ export default function Home({
           {homeContent.fixedMessage || t('home.fixedMessage')}
         </div>
       )}
+
+      <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
+        <button className="btn btn--primary" type="button" onClick={() => onNavigate('/catalog')}>
+          {t('home.viewAllCatalog')}
+        </button>
+      </div>
 
       <section className="home-section">
         <h2>{t('home.popularCategories')}</h2>

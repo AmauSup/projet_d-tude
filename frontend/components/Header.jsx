@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import './Header.css';
 import { useI18n } from '../contexts/I18nContext.jsx';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 
 Header.propTypes = {
   navItems: PropTypes.arrayOf(
@@ -37,6 +38,7 @@ export default function Header({
   showRegisterAction = false,
 }) {
   const { locale, setLocale, t } = useI18n();
+  const { isDark, toggleTheme } = useTheme();
   const [query, setQuery] = useState(searchValue);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -136,6 +138,15 @@ export default function Header({
               <option value="ar">AR</option>
               <option value="he">HE</option>
             </select>
+
+            <button
+              type="button"
+              className="site-header__utility"
+              aria-label={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
+              onClick={toggleTheme}
+            >
+              {isDark ? '☀️' : '🌙'}
+            </button>
 
             <button
               type="button"

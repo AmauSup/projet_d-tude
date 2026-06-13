@@ -14,21 +14,28 @@ export default function Category({
   products = [],
   onSelectCategory,
   onOpenProduct,
+  onAddToCart,
 }) {
   const { t } = useI18n();
   const [availableOnly, setAvailableOnly] = useState(false);
   const [priorityOnly, setPriorityOnly] = useState(false);
+  const [sortBy, setSortBy] = useState('default');
   const [page, setPage] = useState(1);
 
   const filteredProducts = useMemo(() => {
     setPage(1);
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
       if (availableOnly && product.availableStock <= 0) return false;
       if (priorityOnly && product.priorityRank <= 0) return false;
       return true;
     });
+    if (sortBy === 'price-asc') return [...filtered].sort((a, b) => a.priceCents - b.priceCents);
+    if (sortBy === 'price-desc') return [...filtered].sort((a, b) => b.priceCents - a.priceCents);
+    if (sortBy === 'name-asc') return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'name-desc') return [...filtered].sort((a, b) => b.name.localeCompare(a.name));
+    return filtered;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableOnly, priorityOnly, products]);
+  }, [availableOnly, priorityOnly, sortBy, products]);
 
   const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const paginated = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -96,6 +103,19 @@ export default function Category({
             {t('category.priorityOnly')}
           </label>
 
+          <select
+            className="select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            aria-label={t('category.sortBy')}
+          >
+            <option value="default">{t('category.sortDefault')}</option>
+            <option value="price-asc">{t('category.sortPriceAsc')}</option>
+            <option value="price-desc">{t('category.sortPriceDesc')}</option>
+            <option value="name-asc">{t('category.sortNameAsc')}</option>
+            <option value="name-desc">{t('category.sortNameDesc')}</option>
+          </select>
+
           <p className="helper-text">{filteredProducts.length} {t('category.productCount')}</p>
         </aside>
 
@@ -123,13 +143,24 @@ export default function Category({
 
                 <strong>{formatPrice(product.priceCents)}</strong>
 
-                <button
-                  className="btn btn--secondary"
-                  type="button"
-                  onClick={() => onOpenProduct(product.slug)}
-                >
-                  {t('category.viewProduct')}
-                </button>
+                <div className="inline-actions" style={{ marginTop: 8 }}>
+                  {onAddToCart && product.availableStock > 0 && (
+                    <button
+                      className="btn btn--primary"
+                      type="button"
+                      onClick={() => onAddToCart(product.id, 1)}
+                    >
+                      {t('category.addToCart')}
+                    </button>
+                  )}
+                  <button
+                    className="btn btn--secondary"
+                    type="button"
+                    onClick={() => onOpenProduct(product.slug)}
+                  >
+                    {t('category.viewProduct')}
+                  </button>
+                </div>
               </article>
             ))}
             {paginated.length === 0 && (
@@ -161,4 +192,5 @@ Category.propTypes = {
   products: PropTypes.array,
   onSelectCategory: PropTypes.func.isRequired,
   onOpenProduct: PropTypes.func.isRequired,
+  onAddToCart: PropTypes.func,
 };

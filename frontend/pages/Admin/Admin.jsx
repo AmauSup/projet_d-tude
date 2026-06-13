@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import './Admin.css';
 import { adminService } from '../../services/adminService.js';
+import { createEventSource } from '../../services/apiClient.js';
 
 const EMPTY_SLIDE = {
 	id: '',
@@ -14,6 +15,18 @@ const EMPTY_SLIDE = {
 
 function genId() {
 	return `slide-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// Convertit un objet catégorie retourné par l'API admin (snake_case)
+// vers le format camelCase utilisé par le frontend.
+// Nécessaire car l'API storefront et l'API admin retournent des formats différents :
+// storefront → imageUrl, displayOrder | admin → image_url, order_index
+function normalizeAdminCat(c) {
+	return {
+		...c,
+		imageUrl: c.image_url || c.imageUrl || '',
+		displayOrder: c.order_index ?? c.displayOrder ?? 0,
+	};
 }
 
 export default function Admin({
@@ -36,6 +49,32 @@ export default function Admin({
 	const [categoryForms, setCategoryForms] = useState({});
 	const [editCategoryId, setEditCategoryId] = useState(null);
 
+	// Les catégories chargées via l'API ADMIN (pas storefront).
+	// Différence cruciale : l'API storefront filtre les catégories masquées (visible=false),
+	// l'API admin les retourne toutes → l'admin peut voir et réactiver une catégorie cachée.
+	const [adminCats, setAdminCats] = useState([]);
+
+	// useCallback stabilise la référence de la fonction entre les rendus,
+	// indispensable car elle est utilisée comme dépendance du useEffect SSE.
+	// Sans useCallback, une nouvelle fonction serait créée à chaque rendu,
+	// ce qui déclencherait la reconnexion SSE en boucle infinie.
+	const loadAdminCats = useCallback(() => {
+		adminService.listCategories()
+			.then((cats) => setAdminCats(cats.map(normalizeAdminCat)))
+			.catch(() => {});
+	}, []);
+
+	// Abonnement SSE (Server-Sent Events) : dès qu'un admin fait une modification,
+	// le backend diffuse un événement → on recharge les catégories admin silencieusement.
+	// L'EventSource se ferme proprement à la destruction du composant (cleanup),
+	// évitant ainsi les fuites mémoire et les mises à jour sur un composant démonté.
+	useEffect(() => {
+		loadAdminCats();
+		const es = createEventSource('/pg/events/home');
+		es.onmessage = () => loadAdminCats();
+		return () => es.close();
+	}, [loadAdminCats]);
+
 	useEffect(() => {
 		setHomeMessage(homeContent.fixedMessage);
 	}, [homeContent.fixedMessage]);
@@ -55,6 +94,9 @@ export default function Admin({
 	const openEditSlide = (slide) => setSlideForm({ ...slide });
 	const closeSlideForm = () => setSlideForm(null);
 
+	// Convertit un objet slide frontend (camelCase) vers le format attendu par l'API backend.
+	// orderIndex est passé séparément pour permettre la persistance de l'ordre :
+	// lors d'un déplacement, l'index change mais le reste de la slide ne change pas.
 	const toApiSlide = (slide, orderIndex) => ({
 		title: slide.title || '',
 		subtitle: slide.text || '',
@@ -128,12 +170,58 @@ export default function Admin({
 				console.warn('[admin] updateCategory error:', e.message);
 			}
 		}
+		setAdminCats((prev) => prev.map((c) => c.id === catId ? { ...c, name: form.name, imageUrl: form.imageUrl, image_url: form.imageUrl } : c));
 		onUpdateCategory?.(catId, { name: form.name, imageUrl: form.imageUrl });
 		closeEditCategory();
 	};
 
+	// ── Visibilité carrousel ────────────────────────────────────────────────────
+
+	// Bascule la visibilité d'une diapositive du carrousel.
+	// Mise à jour locale immédiate (UX fluide), puis PATCH vers le backend.
+	// La diapositive reste visible dans l'interface admin même quand elle est masquée
+	// sur le site public (storefront) : l'admin garde le contrôle total.
+	const handleToggleCarouselVisible = async (slideId) => {
+		const slide = homeContent.carousel.find((s) => s.id === slideId);
+		if (!slide) return;
+		const newVisible = slide.visible === false;
+		onUpdateCarousel?.(homeContent.carousel.map((s) => s.id === slideId ? { ...s, visible: newVisible } : s));
+		if (isBackendId(slideId)) {
+			try {
+				await adminService.setCarouselSlideVisible(slideId, newVisible);
+			} catch (e) {
+				console.warn('[admin] setCarouselSlideVisible error:', e.message);
+			}
+		}
+	};
+
+	// ── Visibilité catégories ───────────────────────────────────────────────────
+
+	// Même principe que le toggle carousel, mais pour les catégories.
+	// Utilise setAdminCats pour mettre à jour l'état local admin (pas le prop storefront)
+	// et onUpdateCategory pour notifier App.jsx (synchronisation du state global).
+	// Les deux états sont distincts : adminCats inclut les masquées, categories (storefront) non.
+	const handleToggleCategoryVisible = async (catId) => {
+		const cat = adminCats.find((c) => c.id === catId);
+		if (!cat) return;
+		const newVisible = cat.visible === false;
+		setAdminCats((prev) => prev.map((c) => c.id === catId ? { ...c, visible: newVisible } : c));
+		onUpdateCategory?.(catId, { visible: newVisible });
+		if (isBackendId(catId)) {
+			try {
+				await adminService.setCategoryVisible(catId, newVisible);
+			} catch (e) {
+				console.warn('[admin] setCategoryVisible error:', e.message);
+			}
+		}
+	};
+
 	// ── Déplacement de diapositive avec persistance DB ─────────────────────────
 
+	// Déplace une diapositive dans le carrousel (haut/bas) puis persiste l'ordre en base.
+	// Mise à jour locale immédiate via onUpdateCarousel pour un effet instantané (pas d'attente réseau),
+	// puis sauvegarde asynchrone de TOUTES les diapositives avec leur nouvel order_index.
+	// On doit sauvegarder toutes les slides car l'échange modifie deux index simultanément.
 	const handleMoveAndSaveSlide = async (slideId, direction) => {
 		const slides = [...homeContent.carousel];
 		const index = slides.findIndex((s) => s.id === slideId);
@@ -154,6 +242,33 @@ export default function Admin({
 					console.warn('[admin] update carousel order:', e.message);
 				}
 			}
+		}
+	};
+
+	// ── Ordre des catégories (données admin, inclut les masquées) ──────────────
+
+	const sortedAdminCats = useMemo(
+		() => [...adminCats].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
+		[adminCats],
+	);
+
+	// Réordonne les catégories par échange de deux éléments adjacents.
+	// Réassigne des index séquentiels 0,1,2... sur le tableau réordonné,
+	// puis sauvegarde en base et notifie App.jsx pour mettre à jour le storefront.
+	// Promise.all permet d'envoyer tous les PATCH en parallèle plutôt qu'en séquence.
+	const handleMoveCategoryOrder = async (catId, dir) => {
+		const idx = sortedAdminCats.findIndex((c) => c.id === catId);
+		const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+		if (idx < 0 || targetIdx < 0 || targetIdx >= sortedAdminCats.length) return;
+		const reordered = [...sortedAdminCats];
+		[reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+		const withIdx = reordered.map((c, i) => ({ ...c, order_index: i }));
+		setAdminCats(withIdx);
+		withIdx.forEach((c) => onSetCategoryOrder(c.id, c.order_index));
+		try {
+			await Promise.all(withIdx.map((c) => adminService.updateCategory(c.id, { order_index: c.order_index })));
+		} catch (e) {
+			console.warn('[admin] updateCategory order error:', e.message);
 		}
 	};
 
@@ -180,7 +295,7 @@ export default function Admin({
 	};
 
 	return (
-		<section className="page admin-page">
+		<>
 			<header className="page__header">
 				<h1 className="page__title">Gestion de la page d'accueil</h1>
 				<p className="page__subtitle">Modifiez le carrousel, le message fixe, les catégories et les top produits.</p>
@@ -193,34 +308,34 @@ export default function Admin({
 				<article className="metric-card"><h3>Top produits</h3><div className="metric-card__value">{featuredProducts.length}</div></article>
 			</div>
 
-			<div className="admin-sections">
+			<div className="admin-homepage-grid">
 
-				{/* ── Message fixe ─────────────────────────────────────────── */}
-				<article className="card stack admin-full">
-					<h3>Message fixe (sous le carrousel)</h3>
-					<textarea className="textarea" rows="3" value={homeMessage} onChange={(e) => setHomeMessage(e.target.value)} />
-					<div className="page-actions">
-						<button className="btn btn--primary" type="button" onClick={async () => {
-							try { await adminService.updateHomepage(homeMessage); } catch (e) { console.warn('[admin] updateHomepage error:', e.message); }
-							onUpdateHomeMessage(homeMessage);
-						}}>
-							Enregistrer le message
-						</button>
-					</div>
-				</article>
-
-				{/* ── Carrousel ────────────────────────────────────────────── */}
-				<article className="card stack admin-full">
-					<div className="inline-actions" style={{ justifyContent: 'space-between' }}>
+				{/* ── Ligne 1 : Carrousel (pleine largeur) ─────────────────── */}
+				<article className="card stack admin-homepage-full">
+					<div className="inline-actions" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
 						<h3 style={{ margin: 0 }}>Carrousel d'accueil ({homeContent.carousel.length} section(s))</h3>
 						<button className="btn btn--primary" type="button" onClick={openAddSlide}>
 							+ Ajouter une section
 						</button>
 					</div>
 
+					{/* Message fixe intégré */}
+					<div className="panel stack" style={{ marginTop: 8 }}>
+						<h4 style={{ margin: 0 }}>Message fixe (sous le carrousel)</h4>
+						<textarea className="textarea" rows="2" value={homeMessage} onChange={(e) => setHomeMessage(e.target.value)} />
+						<div>
+							<button className="btn btn--primary" type="button" onClick={async () => {
+								try { await adminService.updateHomepage(homeMessage); } catch (e) { console.warn('[admin] updateHomepage error:', e.message); }
+								onUpdateHomeMessage(homeMessage);
+							}}>
+								Enregistrer le message
+							</button>
+						</div>
+					</div>
+
 					{/* Formulaire ajout / édition slide */}
 					{slideForm && (
-						<div className="panel stack" style={{ marginTop: 16 }}>
+						<div className="panel stack" style={{ marginTop: 8 }}>
 							<h4>{slideForm.id && homeContent.carousel.some((s) => s.id === slideForm.id) ? 'Modifier la section' : 'Nouvelle section'}</h4>
 							<div className="form-grid">
 								<div>
@@ -280,13 +395,16 @@ export default function Admin({
 								<div className="inline-actions" style={{ flexShrink: 0 }}>
 									<button className="btn btn--secondary" type="button" onClick={() => handleMoveAndSaveSlide(slide.id, 'up')} disabled={index === 0} aria-label="Monter">↑</button>
 									<button className="btn btn--secondary" type="button" onClick={() => handleMoveAndSaveSlide(slide.id, 'down')} disabled={index === homeContent.carousel.length - 1} aria-label="Descendre">↓</button>
-									<button className="btn btn--secondary" type="button" onClick={() => openEditSlide(slide)}>Modifier</button>
 									<button
-										className="btn btn--secondary"
+										className={`btn ${slide.visible === false ? 'btn--danger' : 'btn--secondary'}`}
 										type="button"
-										style={{ color: 'var(--color-danger, #c0392b)' }}
-										onClick={() => handleDeleteSlide(slide.id)}
+										style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+										onClick={() => handleToggleCarouselVisible(slide.id)}
 									>
+										{slide.visible === false ? 'Masqué' : 'Visible'}
+									</button>
+									<button className="btn btn--secondary" type="button" onClick={() => openEditSlide(slide)}>Modifier</button>
+									<button className="btn btn--secondary" type="button" style={{ color: 'var(--color-danger, #c0392b)' }} onClick={() => handleDeleteSlide(slide.id)}>
 										Supprimer
 									</button>
 								</div>
@@ -295,21 +413,47 @@ export default function Admin({
 					</div>
 				</article>
 
-				{/* ── Catégories ───────────────────────────────────────────── */}
+				{/* ── Ligne 2 gauche : Catégories ──────────────────────────── */}
 				<article className="card stack">
 					<h3>Catégories (image, nom, ordre d'affichage)</h3>
 					<div className="table-like">
-						{categories.map((cat) => (
-							<div key={cat.id} className="table-like__row" style={{ flexWrap: 'wrap', gap: 12 }}>
-								{cat.imageUrl && (
-									<img src={cat.imageUrl} alt={cat.name} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
-								)}
-								<div style={{ flex: 1, minWidth: 120 }}>
-									<strong>{cat.name}</strong>
-									{cat.slug && <p className="helper-text" style={{ margin: 0 }}>/{cat.slug}</p>}
+						{sortedAdminCats.map((cat, idx) => (
+							<div key={cat.id} className="table-like__row" style={{ gap: 8, alignItems: 'center' }}>
+								<div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+									<button
+										className="btn btn--secondary"
+										type="button"
+										style={{ padding: '2px 6px', lineHeight: 1, fontSize: '0.75rem' }}
+										disabled={idx === 0}
+										onClick={() => handleMoveCategoryOrder(cat.id, 'up')}
+										aria-label="Monter"
+									>▲</button>
+									<button
+										className="btn btn--secondary"
+										type="button"
+										style={{ padding: '2px 6px', lineHeight: 1, fontSize: '0.75rem' }}
+										disabled={idx === sortedAdminCats.length - 1}
+										onClick={() => handleMoveCategoryOrder(cat.id, 'down')}
+										aria-label="Descendre"
+									>▼</button>
 								</div>
+								{cat.imageUrl && (
+									<img src={cat.imageUrl} alt={cat.name} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />
+								)}
+								<div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+									<strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{idx + 1}. {cat.name}</strong>
+									{cat.slug && <p className="helper-text" style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>/{cat.slug}</p>}
+								</div>
+								<button
+									className={`btn ${cat.visible === false ? 'btn--danger' : 'btn--secondary'}`}
+									type="button"
+									style={{ fontSize: '0.75rem', padding: '2px 8px', flexShrink: 0 }}
+									onClick={() => handleToggleCategoryVisible(cat.id)}
+								>
+									{cat.visible === false ? 'Masqué' : 'Visible'}
+								</button>
 								{editCategoryId === cat.id ? (
-									<div className="stack" style={{ flex: '1 1 300px' }}>
+									<div className="stack" style={{ flex: '1 1 100%' }}>
 										<input
 											className="input"
 											placeholder="Nom de la catégorie"
@@ -328,60 +472,51 @@ export default function Admin({
 										</div>
 									</div>
 								) : (
-									<div className="inline-actions" style={{ flexShrink: 0 }}>
-										<span className="helper-text">Ordre : </span>
-										<input
-											className="input"
-											type="number"
-											min="1"
-											style={{ width: 64 }}
-											value={cat.displayOrder ?? 1}
-											onChange={(e) => onSetCategoryOrder(cat.id, e.target.value)}
-										/>
-										<button className="btn btn--secondary" type="button" onClick={() => openEditCategory(cat)}>Modifier</button>
-									</div>
+									<button className="btn btn--secondary" type="button" style={{ flexShrink: 0 }} onClick={() => openEditCategory(cat)}>Modifier</button>
 								)}
 							</div>
 						))}
 					</div>
 				</article>
 
-				{/* ── Top produits du moment ───────────────────────────────── */}
+				{/* ── Ligne 2 droite : Top produits du moment ──────────────── */}
 				<article className="card stack">
 					<h3>Top produits du moment ({featuredProducts.length} sélectionné(s))</h3>
-					<p className="helper-text">Les produits ci-dessous apparaissent sur la page d'accueil. Utilisez les flèches pour réordonner.</p>
-
-					{featuredProducts.length > 0 && (
-						<div className="table-like">
-							{featuredProducts.map((p, idx) => (
-								<div className="table-like__row" key={p.id} style={{ alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-									{p.image && <img src={p.image} alt={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
-									<div style={{ flex: 1 }}>
-										<strong>#{idx + 1} {p.name}</strong>
-										<p className="helper-text" style={{ margin: 0 }}>{p.availableStock > 0 ? `${p.availableStock} en stock` : 'Rupture'}</p>
-									</div>
-									<div className="inline-actions" style={{ flexShrink: 0 }}>
-										<button className="btn btn--secondary" type="button" onClick={() => moveFeatured(p.id, 'up')} disabled={idx === 0} aria-label="Monter">↑</button>
-										<button className="btn btn--secondary" type="button" onClick={() => moveFeatured(p.id, 'down')} disabled={idx === featuredProducts.length - 1} aria-label="Descendre">↓</button>
-										<button className="btn btn--secondary" type="button" style={{ color: 'var(--color-danger, #c0392b)' }} onClick={() => onToggleFeatured(p.id)}>
-											Retirer
-										</button>
-									</div>
-								</div>
-							))}
-						</div>
+					<p className="helper-text">Ces produits apparaissent sur la page d'accueil. Utilisez les flèches pour réordonner.</p>
+					{featuredProducts.length === 0 && (
+						<p className="helper-text">Aucun top produit sélectionné.</p>
 					)}
+					<div className="table-like">
+						{featuredProducts.map((p, idx) => (
+							<div className="table-like__row" key={p.id} style={{ alignItems: 'center', gap: 8 }}>
+								{p.image && <img src={p.image} alt={p.name} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />}
+								<div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+									<strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>#{idx + 1} {p.name}</strong>
+									<p className="helper-text" style={{ margin: 0, whiteSpace: 'nowrap' }}>{p.availableStock > 0 ? `${p.availableStock} en stock` : 'Rupture'}</p>
+								</div>
+								<div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+									<button className="btn btn--secondary" type="button" style={{ padding: '2px 6px', lineHeight: 1, fontSize: '0.75rem' }} onClick={() => moveFeatured(p.id, 'up')} disabled={idx === 0} aria-label="Monter">↑</button>
+									<button className="btn btn--secondary" type="button" style={{ padding: '2px 6px', lineHeight: 1, fontSize: '0.75rem' }} onClick={() => moveFeatured(p.id, 'down')} disabled={idx === featuredProducts.length - 1} aria-label="Descendre">↓</button>
+									<button className="btn btn--secondary" type="button" style={{ fontSize: '0.8rem', padding: '2px 8px', color: 'var(--color-danger, #c0392b)' }} onClick={() => onToggleFeatured(p.id)}>Retirer</button>
+								</div>
+							</div>
+						))}
+					</div>
+				</article>
 
-					<h4 style={{ marginTop: 16 }}>Ajouter un produit aux top produits</h4>
+				{/* ── Ligne 3 gauche : Ajouter un produit aux top produits ─── */}
+				<article className="card stack">
+					<h3>Ajouter un produit aux top produits</h3>
+					<p className="helper-text">Produits non encore sélectionnés ({products.filter((p) => p.featuredRank <= 0).length} disponibles).</p>
 					<div className="table-like">
 						{products.filter((p) => p.featuredRank <= 0).slice(0, 30).map((p) => (
-							<div className="table-like__row" key={p.id} style={{ alignItems: 'center', gap: 12 }}>
-								{p.image && <img src={p.image} alt={p.name} style={{ width: 44, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
-								<div style={{ flex: 1 }}>
-									<strong>{p.name}</strong>
-									<p className="helper-text" style={{ margin: 0 }}>{p.availableStock > 0 ? `${p.availableStock} en stock` : 'Rupture'}</p>
+							<div className="table-like__row" key={p.id} style={{ alignItems: 'center', gap: 8 }}>
+								{p.image && <img src={p.image} alt={p.name} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />}
+								<div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+									<strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{p.name}</strong>
+									<p className="helper-text" style={{ margin: 0, whiteSpace: 'nowrap' }}>{p.availableStock > 0 ? `${p.availableStock} en stock` : 'Rupture'}</p>
 								</div>
-								<button className="btn btn--secondary" type="button" onClick={() => onToggleFeatured(p.id)}>
+								<button className="btn btn--secondary" type="button" style={{ flexShrink: 0, fontSize: '0.8rem', padding: '3px 10px' }} onClick={() => onToggleFeatured(p.id)}>
 									+ Ajouter
 								</button>
 							</div>
@@ -389,22 +524,23 @@ export default function Admin({
 					</div>
 				</article>
 
-				{/* ── Gestion stocks & priorités ────────────────────────────── */}
-				<article className="card stack admin-full">
+				{/* ── Ligne 3 droite : Produits priorité & disponibilité ───── */}
+				<article className="card stack">
 					<h3>Produits — priorité & disponibilité</h3>
+					<p className="helper-text">{products.length} produit(s) au total.</p>
 					<div className="table-like">
 						{products.slice(0, 50).map((product) => (
-							<div className="table-like__row" key={product.id} style={{ flexWrap: 'wrap', gap: 10 }}>
-								<div style={{ flex: 1, minWidth: 160 }}>
-									<strong>{product.name}</strong>
-									<p className="helper-text" style={{ margin: 0 }}>{product.availableStock > 0 ? `${product.availableStock} en stock` : 'Rupture'}</p>
+							<div className="table-like__row" key={product.id} style={{ alignItems: 'center', gap: 8 }}>
+								<div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+									<strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{product.name}</strong>
+									<p className="helper-text" style={{ margin: 0, whiteSpace: 'nowrap' }}>{product.availableStock > 0 ? `${product.availableStock} en stock` : 'Rupture'}</p>
 								</div>
-								<div className="inline-actions" style={{ flexShrink: 0 }}>
-									<button className="btn btn--secondary" type="button" onClick={() => onToggleProductPriority(product.id)}>
+								<div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+									<button className="btn btn--secondary" type="button" style={{ fontSize: '0.78rem', padding: '2px 8px' }} onClick={() => onToggleProductPriority(product.id)}>
 										{product.priorityRank > 0 ? 'Retirer priorité' : 'Prioritaire'}
 									</button>
-									<button className="btn btn--secondary" type="button" onClick={() => onToggleProductAvailability(product.id)}>
-										{product.availableStock > 0 ? 'Passer en rupture' : 'Remettre en stock'}
+									<button className="btn btn--secondary" type="button" style={{ fontSize: '0.78rem', padding: '2px 8px' }} onClick={() => onToggleProductAvailability(product.id)}>
+										{product.availableStock > 0 ? 'Rupture' : 'En stock'}
 									</button>
 								</div>
 							</div>
@@ -413,6 +549,6 @@ export default function Admin({
 				</article>
 
 			</div>
-		</section>
+		</>
 	);
 }

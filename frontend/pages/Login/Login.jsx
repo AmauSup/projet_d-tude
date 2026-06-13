@@ -18,6 +18,10 @@ export default function Login({ onLogin, onNavigate }) {
 		setLoading(true);
 		try {
 			const result = await onLogin({ email, password, rememberMe });
+			if (result.requires_2fa) {
+				onNavigate('/verify-2fa');
+				return;
+			}
 			setMessage(result.message);
 			if (result.success) {
 				onNavigate(from);

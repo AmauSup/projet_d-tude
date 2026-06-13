@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './Chatbot.css';
+import { apiClient } from '../../services/apiClient.js';
 import { supportService } from '../../services/supportService.js';
 import { useI18n } from '../../contexts/I18nContext.jsx';
 
@@ -64,10 +65,9 @@ export default function Chatbot() {
   const [faqExpanded, setFaqExpanded] = useState(false);
   const bottomRef = useRef(null);
 
-  // Charge le FAQ depuis la base de données
+  // Charge le FAQ depuis la base de données (via apiClient pour cibler le bon port backend)
   useEffect(() => {
-    fetch('/api/pg/chatbot/faq')
-      .then((r) => r.json())
+    apiClient.get('/pg/chatbot/faq')
       .then((d) => { if (d.faq?.length) setFaq(d.faq); })
       .catch(() => { /* garde le fallback local */ });
   }, []);

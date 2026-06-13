@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { adminService } from '../../services/adminService.js';
-import { createEventSource } from '../../services/apiClient.js';
+import { adminService } from '../services/adminService.js';
+import { createEventSource } from '../../frontend/services/apiClient.js';
 
+// Valeurs initiales du formulaire de création de produit.
 const EMPTY_FORM = {
   name: '', description: '', characteristics: '',
   price: '', stock: '', image: '', category_id: '',
@@ -11,15 +12,25 @@ const EMPTY_FORM = {
 
 CreateProductForm.propTypes = {
   categories: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.number, name: PropTypes.string })).isRequired,
-  onCreated: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
+  onCreated: PropTypes.func.isRequired, // Callback appelé après création réussie
+  onCancel: PropTypes.func.isRequired,  // Callback pour fermer le formulaire sans sauvegarder
 };
 
+// Formulaire de création d'un nouveau produit.
+// Valide les champs obligatoires côté client avant d'envoyer au backend.
+// Paramètres :
+//   categories (array)    — liste des catégories disponibles pour le select
+//   onCreated  (function) — appelé après création réussie (déclenche le rechargement)
+//   onCancel   (function) — ferme le formulaire
 function CreateProductForm({ categories, onCreated, onCancel }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM); // Données du formulaire
+  const [saving, setSaving] = useState(false);  // true pendant l'appel API (désactive le bouton)
+  const [error, setError] = useState('');       // Erreur de validation ou API
 
+  // Met à jour un seul champ du formulaire sans écraser les autres.
+  // Paramètres :
+  //   field (string) — nom du champ
+  //   value (any)    — nouvelle valeur
   const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e) => {
@@ -42,7 +53,7 @@ function CreateProductForm({ categories, onCreated, onCancel }) {
         priority: Number.parseInt(form.priority, 10) || 0,
         featured: Number.parseInt(form.featured, 10) || 0,
       });
-      onCreated();
+      onCreated(); // Déclenche le rechargement de la liste dans le parent
     } catch (err) {
       setError(err.message || 'Erreur lors de la création.');
     } finally {
@@ -104,13 +115,20 @@ function CreateProductForm({ categories, onCreated, onCancel }) {
 }
 
 SortBtn.propTypes = {
-  field: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  sortField: PropTypes.string.isRequired,
-  sortDir: PropTypes.string.isRequired,
-  onToggle: PropTypes.func.isRequired,
+  field: PropTypes.string.isRequired,     // Champ sur lequel ce bouton trie
+  label: PropTypes.string.isRequired,     // Texte affiché dans l'en-tête
+  sortField: PropTypes.string.isRequired, // Champ de tri actuellement actif
+  sortDir: PropTypes.string.isRequired,   // Direction active ('asc' ou 'desc')
+  onToggle: PropTypes.func.isRequired,    // Callback appelé avec `field` au clic
 };
 
+// Bouton d'en-tête de colonne avec indicateur de tri (▲ / ▼).
+// Paramètres :
+//   field     (string)   — champ de tri correspondant à cette colonne
+//   label     (string)   — libellé de la colonne
+//   sortField (string)   — champ de tri actuellement actif
+//   sortDir   (string)   — direction active
+//   onToggle  (function) — bascule le tri sur ce champ
 function SortBtn({ field, label, sortField, sortDir, onToggle }) {
   let indicator = '';
   if (sortField === field) indicator = sortDir === 'asc' ? ' ▲' : ' ▼';
@@ -122,12 +140,14 @@ function SortBtn({ field, label, sortField, sortDir, onToggle }) {
 }
 
 EditProductForm.propTypes = {
-  product: PropTypes.object.isRequired,
+  product: PropTypes.object.isRequired,  // Produit à modifier (données préchargées dans le form)
   categories: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.number, name: PropTypes.string })).isRequired,
-  onSaved: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
+  onSaved: PropTypes.func.isRequired,    // Callback après sauvegarde réussie
+  onCancel: PropTypes.func.isRequired,   // Ferme le formulaire sans sauvegarder
 };
 
+// Formulaire d'édition d'un produit existant.
+// Pré-remplit tous les champs depuis l'objet `product` fourni par le tableau.
 function EditProductForm({ product, categories, onSaved, onCancel }) {
   const [form, setForm] = useState({
     name: product.name || '',
@@ -230,20 +250,26 @@ function EditProductForm({ product, categories, onSaved, onCancel }) {
   );
 }
 
-/* Inline editable number cell — click the pill to edit in place */
 InlineNumberCell.propTypes = {
-  value: PropTypes.number.isRequired,
+  value: PropTypes.number.isRequired,                                       // Valeur numérique courante
   productId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  onSave: PropTypes.func.isRequired,
-  renderPill: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,   // Appelé avec (productId, newValue) à la validation
+  renderPill: PropTypes.func.isRequired, // Render prop : reçoit la valeur et retourne le JSX de la pastille
 };
 
+// Cellule de tableau avec édition inline au clic.
+// En mode lecture : affiche une pastille (via renderPill).
+// En mode édition (après clic) : remplace la pastille par un input numérique.
+// Valide et sauvegarde au blur ou à la touche Entrée ; annule avec Escape.
 function InlineNumberCell({ value, productId, onSave, renderPill }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState(false); // true = mode édition (input visible)
+  const [draft, setDraft] = useState('');         // Valeur en cours de frappe (string pour contrôler l'input)
 
+  // Passe en mode édition et initialise le draft avec la valeur actuelle
   const open = () => { setDraft(String(value)); setEditing(true); };
   const cancel = () => setEditing(false);
+
+  // Valide le draft : si c'est un entier ≥ 0, appelle onSave et ferme l'édition.
   const commit = () => {
     const num = Number.parseInt(draft, 10);
     if (!Number.isNaN(num) && num >= 0) onSave(productId, num);
@@ -261,7 +287,7 @@ function InlineNumberCell({ value, productId, onSave, renderPill }) {
         value={draft}
         style={{ width: 72 }}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={commit}   // Sauvegarde si l'utilisateur clique ailleurs
         onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
       />
     );
@@ -281,18 +307,25 @@ function InlineNumberCell({ value, productId, onSave, renderPill }) {
   );
 }
 
+// Page principale de gestion des produits.
+// Affiche tous les produits dans un tableau triable et filtrable par catégorie.
+// Permet la création, modification, suppression individuelle ou en lot,
+// et l'édition inline du stock, de la priorité et du rang "mis en avant".
+// S'abonne aux SSE pour se mettre à jour en temps réel quand un autre admin modifie un produit.
 export default function AdminProducts() {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [sortField, setSortField] = useState('name');
-  const [sortDir, setSortDir] = useState('asc');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [selected, setSelected] = useState(new Set());
-  const [showCreate, setShowCreate] = useState(false);
-  const [editProduct, setEditProduct] = useState(null);
+  const [products, setProducts] = useState([]);       // Tous les produits (non filtrés)
+  const [categories, setCategories] = useState([]);   // Catégories déduites de la liste produits
+  const [loading, setLoading] = useState(true);       // true pendant le chargement initial
+  const [error, setError] = useState('');             // Erreur API
+  const [sortField, setSortField] = useState('name'); // Champ de tri actif
+  const [sortDir, setSortDir] = useState('asc');      // Direction du tri
+  const [filterCategory, setFilterCategory] = useState('all'); // Filtre par catégorie ('all' ou id)
+  const [selected, setSelected] = useState(new Set()); // Set d'ids de produits cochés (sélection multiple)
+  const [showCreate, setShowCreate] = useState(false); // Affiche/masque le formulaire de création
+  const [editProduct, setEditProduct] = useState(null); // Produit en cours d'édition (null = aucun)
 
+  // Charge les produits et déduit la liste de catégories à partir des produits reçus.
+  // On déduplique les catégories avec un Set pour éviter les doublons dans le select.
   const load = () => {
     setLoading(true);
     adminService.listProducts()
@@ -314,19 +347,23 @@ export default function AdminProducts() {
 
   useEffect(() => { load(); }, []);
 
+  // Abonnement SSE : rechargement silencieux de la liste produits en temps réel
+  // quand un autre admin modifie un produit (création, mise à jour, suppression).
   useEffect(() => {
     const es = createEventSource('/pg/events/home');
     es.onmessage = () => {
       adminService.listProducts().then(setProducts).catch(() => {});
     };
-    return () => es.close();
+    return () => es.close(); // Ferme la connexion SSE à la destruction du composant
   }, []);
 
+  // Bascule le tri : même champ = inverse la direction ; nouveau champ = repart en 'asc'.
   const toggleSort = (field) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  // Produits filtrés par catégorie puis triés selon sortField et sortDir.
   const filtered = products
     .filter((p) => filterCategory === 'all' || String(p.category_id) === String(filterCategory))
     .slice()
@@ -337,17 +374,24 @@ export default function AdminProducts() {
       return sortDir === 'asc' ? Number(va) - Number(vb) : Number(vb) - Number(va);
     });
 
+  // allSelected : true si tous les produits filtrés sont cochés
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
+
+  // Coche ou décoche tous les produits filtrés
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
     else setSelected(new Set(filtered.map((p) => p.id)));
   };
+
+  // Ajoute ou retire un produit de la sélection individuelle
   const toggleOne = (id) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
 
+  // Supprime (soft-delete) tous les produits cochés en parallèle.
+  // Met à jour la liste locale après suppression.
   const handleDeleteSelected = async () => {
     if (!globalThis.confirm(`Supprimer ${selected.size} produit(s) ?`)) return;
     try {
@@ -357,6 +401,9 @@ export default function AdminProducts() {
     } catch (e) { setError(e.message); }
   };
 
+  // Supprime un produit individuel après confirmation.
+  // Paramètres :
+  //   product (object) — produit à supprimer (utilisé pour l'id et le nom dans la confirmation)
   const handleDelete = async (product) => {
     if (!globalThis.confirm(`Supprimer "${product.name}" ?`)) return;
     try {
@@ -366,7 +413,7 @@ export default function AdminProducts() {
     } catch (e) { setError(e.message); }
   };
 
-  /* Inline-edit handlers for stock / priority / featured */
+  // Sauvegarde le nouveau stock via édition inline (depuis InlineNumberCell).
   const handleSaveStock = async (productId, newStock) => {
     try {
       await adminService.updateProduct(productId, { stock: newStock });
@@ -374,6 +421,7 @@ export default function AdminProducts() {
     } catch (e) { setError(e.message); }
   };
 
+  // Sauvegarde la nouvelle priorité via édition inline.
   const handleSavePriority = async (productId, newPriority) => {
     try {
       await adminService.updateProduct(productId, { priority: newPriority });
@@ -381,6 +429,7 @@ export default function AdminProducts() {
     } catch (e) { setError(e.message); }
   };
 
+  // Sauvegarde le nouveau rang "mis en avant" via édition inline.
   const handleSaveFeatured = async (productId, newFeatured) => {
     try {
       await adminService.updateProduct(productId, { featured: newFeatured });
@@ -401,6 +450,7 @@ export default function AdminProducts() {
 
       {error && <div className="notice notice--warning" role="alert">{error}</div>}
 
+      {/* Formulaire de création affiché en accordéon */}
       {showCreate && (
         <CreateProductForm
           categories={categories}
@@ -409,6 +459,7 @@ export default function AdminProducts() {
         />
       )}
 
+      {/* Formulaire d'édition — s'affiche sous les filtres quand editProduct !== null */}
       {editProduct && (
         <EditProductForm
           product={editProduct}
@@ -420,24 +471,13 @@ export default function AdminProducts() {
 
       <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
         <label htmlFor="admin-filter-cat" className="form-label" style={{ marginBottom: 0 }}>Catégorie :</label>
-        <select
-          id="admin-filter-cat"
-          className="select"
-          style={{ width: 'auto' }}
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
+        <select id="admin-filter-cat" className="select" style={{ width: 'auto' }} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
           <option value="all">Toutes</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <span className="helper-text">{filtered.length} produit(s)</span>
         {selected.size > 0 && (
-          <button
-            type="button"
-            className="btn btn--secondary"
-            style={{ color: 'var(--color-danger, #c0392b)', marginLeft: 'auto' }}
-            onClick={handleDeleteSelected}
-          >
+          <button type="button" className="btn btn--secondary" style={{ color: 'var(--color-danger, #c0392b)', marginLeft: 'auto' }} onClick={handleDeleteSelected}>
             Supprimer la sélection ({selected.size})
           </button>
         )}
@@ -451,9 +491,7 @@ export default function AdminProducts() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Tout sélectionner" />
-              </th>
+              <th><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Tout sélectionner" /></th>
               <th><SortBtn field="name" label="Nom" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th><SortBtn field="category_name" label="Catégorie" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
               <th><SortBtn field="price" label="Prix" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} /></th>
@@ -468,14 +506,10 @@ export default function AdminProducts() {
               <tr><td colSpan="8" style={{ textAlign: 'center' }}><span className="helper-text">Aucun produit.</span></td></tr>
             )}
             {filtered.map((product) => (
+              // Ligne en grisé si le produit est en rupture de stock
               <tr key={product.id} className={product.stock <= 0 ? 'row--unavailable' : ''}>
                 <td>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(product.id)}
-                    onChange={() => toggleOne(product.id)}
-                    aria-label={`Sélectionner ${product.name}`}
-                  />
+                  <input type="checkbox" checked={selected.has(product.id)} onChange={() => toggleOne(product.id)} aria-label={`Sélectionner ${product.name}`} />
                 </td>
                 <td>
                   <strong>{product.name}</strong>
@@ -484,7 +518,7 @@ export default function AdminProducts() {
                 <td>{product.category_name || '—'}</td>
                 <td>{Number(product.price).toFixed(2)} €</td>
 
-                {/* Stock — édition inline au clic */}
+                {/* Stock — pastille verte/rouge avec édition inline au clic */}
                 <td>
                   <InlineNumberCell
                     value={Number(product.stock) || 0}
@@ -498,7 +532,7 @@ export default function AdminProducts() {
                   />
                 </td>
 
-                {/* Priorité — édition inline au clic */}
+                {/* Priorité — # affiché seulement si > 0, sinon tiret */}
                 <td>
                   <InlineNumberCell
                     value={Number(product.priority) || 0}
@@ -510,7 +544,7 @@ export default function AdminProducts() {
                   />
                 </td>
 
-                {/* Mis en avant — édition inline au clic */}
+                {/* Mis en avant — étoile + rang si > 0, tiret sinon */}
                 <td>
                   <InlineNumberCell
                     value={Number(product.featured) || 0}
@@ -522,23 +556,12 @@ export default function AdminProducts() {
                   />
                 </td>
 
-                {/* Actions — Modifier + Supprimer uniquement */}
                 <td>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      style={{ fontSize: '0.82rem', padding: '6px 14px' }}
-                      onClick={() => { setEditProduct(product); setShowCreate(false); }}
-                    >
+                    <button type="button" className="btn btn--primary" style={{ fontSize: '0.82rem', padding: '6px 14px' }} onClick={() => { setEditProduct(product); setShowCreate(false); }}>
                       Modifier
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      style={{ fontSize: '0.82rem', padding: '6px 14px', color: 'var(--color-danger, #c0392b)' }}
-                      onClick={() => handleDelete(product)}
-                    >
+                    <button type="button" className="btn btn--secondary" style={{ fontSize: '0.82rem', padding: '6px 14px', color: 'var(--color-danger, #c0392b)' }} onClick={() => handleDelete(product)}>
                       Supprimer
                     </button>
                   </div>

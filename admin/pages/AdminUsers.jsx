@@ -1,45 +1,66 @@
 import React, { useEffect, useState } from 'react';
-import { adminService } from '../../services/adminService.js';
+import { adminService } from '../services/adminService.js';
 
+// Valeurs initiales vides du formulaire de création d'utilisateur.
+// Réutilisé après soumission pour remettre le formulaire à zéro.
 const EMPTY_FORM = { email: '', password: '', first_name: '', last_name: '', is_admin: false };
 
-export default function AdminUsers() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
+// Nombre d'utilisateurs affichés par page dans le tableau paginé.
+const PAGE_SIZE = 20;
 
+// Page de gestion des utilisateurs — liste, création et désactivation de comptes.
+// La suppression est un soft-delete (PATCH) : le compte est marqué deleted_at,
+// jamais effacé physiquement pour préserver l'historique des commandes.
+export default function AdminUsers() {
+  const [users, setUsers] = useState([]);         // Liste de tous les utilisateurs actifs
+  const [loading, setLoading] = useState(true);   // true pendant le chargement initial
+  const [error, setError] = useState('');         // Erreur de chargement
+  const [feedback, setFeedback] = useState('');   // Message de confirmation ou d'erreur d'action
+  const [showForm, setShowForm] = useState(false); // true = formulaire de création visible
+  const [form, setForm] = useState(EMPTY_FORM);   // Données du formulaire de création
+  const [searchQuery, setSearchQuery] = useState(''); // Filtre textuel (email, prénom, nom)
+  const [page, setPage] = useState(1);            // Page courante de la pagination
+
+  // Charge (ou recharge) la liste des utilisateurs depuis l'API admin.
+  // Appelé au montage et après chaque création/désactivation.
   const load = () => {
     setLoading(true);
-    adminService.listUsers().then((u) => { setUsers(u); setLoading(false); }).catch((e) => { setError(e.message); setLoading(false); });
+    adminService.listUsers()
+      .then((u) => { setUsers(u); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
   };
 
   useEffect(() => { load(); }, []);
 
+  // Filtre les utilisateurs selon la recherche textuelle (insensible à la casse).
+  // Recherche dans email, prénom et nom simultanément.
   const filtered = users.filter((u) => {
     const q = searchQuery.toLowerCase();
     return !q || u.email?.toLowerCase().includes(q) || u.first_name?.toLowerCase().includes(q) || u.last_name?.toLowerCase().includes(q);
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Tranche de la page courante (ex: page 2 → éléments 20 à 39)
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Désactive un compte utilisateur (soft-delete via PATCH).
+  // Demande confirmation avant de procéder.
+  // Paramètres :
+  //   id    (number) — identifiant de l'utilisateur
+  //   email (string) — email affiché dans le message de confirmation
   const handleDelete = async (id, email) => {
-    if (!window.confirm(`Désactiver le compte "${email}" ?`)) return;
+    if (!globalThis.confirm(`Désactiver le compte "${email}" ?`)) return;
     try {
       await adminService.deleteUser(id);
       setFeedback(`Compte "${email}" désactivé.`);
-      load();
+      load(); // Recharge la liste pour refléter la désactivation
     } catch (e) {
       setFeedback(`Erreur : ${e.message}`);
     }
   };
 
+  // Crée un nouveau compte utilisateur via le formulaire.
+  // Valide les champs obligatoires côté client avant d'appeler l'API.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email || !form.password) { setFeedback('Email et mot de passe obligatoires.'); return; }
@@ -47,7 +68,7 @@ export default function AdminUsers() {
       await adminService.createUser(form);
       setFeedback('Utilisateur créé.');
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(EMPTY_FORM); // Remet le formulaire à zéro pour la prochaine utilisation
       load();
     } catch (err) {
       setFeedback(`Erreur : ${err.message}`);
@@ -58,13 +79,16 @@ export default function AdminUsers() {
     <article className="card stack">
       <div className="inline-actions" style={{ justifyContent: 'space-between' }}>
         <h2>Gestion des utilisateurs</h2>
-        <button type="button" className="btn btn--primary" onClick={() => { setShowForm(true); setForm(EMPTY_FORM); setFeedback(''); }}>+ Nouvel utilisateur</button>
+        <button type="button" className="btn btn--primary" onClick={() => { setShowForm(true); setForm(EMPTY_FORM); setFeedback(''); }}>
+          + Nouvel utilisateur
+        </button>
       </div>
 
       {loading && <div className="notice notice--info">Chargement…</div>}
       {error && <div className="notice notice--warning">Erreur : {error}</div>}
       {feedback && <div className="notice notice--info">{feedback}</div>}
 
+      {/* Formulaire de création de compte (affiché en accordéon) */}
       {showForm && (
         <div className="panel stack">
           <h3>Nouvel utilisateur</h3>
@@ -87,6 +111,7 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {/* Champ de recherche — remet la pagination à la page 1 à chaque modification */}
       <input
         className="input"
         style={{ maxWidth: 300 }}
@@ -115,6 +140,7 @@ export default function AdminUsers() {
                 <td>{u.first_name} {u.last_name}</td>
                 <td>{u.email}</td>
                 <td>
+                  {/* Pastille différente pour admin (orange) et client (vert) */}
                   <span className={`status-pill ${u.is_admin ? 'status-pill--warning' : 'status-pill--ok'}`}>
                     {u.is_admin ? 'Admin' : 'Client'}
                   </span>
@@ -136,6 +162,7 @@ export default function AdminUsers() {
         </table>
       </div>
 
+      {/* Pagination : n'apparaît que si plus d'une page */}
       {totalPages > 1 && (
         <nav className="pagination" aria-label="Pagination utilisateurs">
           <button className="pagination__btn" type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>‹</button>

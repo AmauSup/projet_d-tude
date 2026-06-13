@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient.js';
+import { apiClient } from '../../frontend/services/apiClient.js';
 
 // Toutes les méthodes de ce service appellent des routes /pg/admin/*.
 // Ces routes sont protégées côté backend par les middlewares authenticateToken + requireAdmin.

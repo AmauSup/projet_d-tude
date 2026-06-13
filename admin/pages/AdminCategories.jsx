@@ -1,20 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { adminService } from '../../services/adminService.js';
-import { createEventSource } from '../../services/apiClient.js';
+import { adminService } from '../services/adminService.js';
+import { createEventSource } from '../../frontend/services/apiClient.js';
 
+// Valeurs initiales du formulaire création / édition de catégorie.
+// Réutilisé pour remettre le formulaire à zéro après soumission ou annulation.
 const EMPTY_FORM = { name: '', description: '', image_url: '' };
 
+// Page de gestion des catégories.
+// Permet de créer, modifier, supprimer et réordonner les catégories,
+// ainsi que de basculer leur visibilité sur la page d'accueil.
+// Se synchronise en temps réel via SSE pour refléter les modifications d'autres admins.
 export default function AdminCategories() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [categories, setCategories] = useState([]);   // Toutes les catégories (y compris masquées)
+  const [loading, setLoading] = useState(true);        // true pendant le chargement initial
+  const [error, setError] = useState('');              // Erreur de chargement API
+  const [feedback, setFeedback] = useState('');        // Message de confirmation d'action (création, suppression…)
+  const [showForm, setShowForm] = useState(false);     // true = formulaire création/édition visible
+  const [editTarget, setEditTarget] = useState(null);  // Catégorie en cours d'édition (null = mode création)
+  const [form, setForm] = useState(EMPTY_FORM);        // Données du formulaire
+  const [saving, setSaving] = useState(false);         // true pendant l'appel API de sauvegarde
+  const [formError, setFormError] = useState('');      // Erreur de validation du formulaire
 
+  // Charge (ou recharge) toutes les catégories depuis l'API admin.
+  // Appelé au montage et après chaque création / modification / suppression.
   const load = () => {
     setLoading(true);
     adminService.listCategories()
@@ -24,9 +32,7 @@ export default function AdminCategories() {
 
   useEffect(() => { load(); }, []);
 
-  // Rechargement silencieux en temps réel.
-  // Quand un autre admin (ou un autre onglet) modifie les catégories,
-  // le backend émet un événement SSE → on recharge sans spinner de chargement.
+  // Abonnement SSE : rechargement silencieux quand un autre admin modifie les catégories.
   // Le cleanup (es.close()) est essentiel pour éviter les fuites mémoire.
   useEffect(() => {
     const es = createEventSource('/pg/events/home');
@@ -36,8 +42,14 @@ export default function AdminCategories() {
     return () => es.close();
   }, []);
 
+  // Met à jour un seul champ du formulaire sans écraser les autres.
+  // Paramètres :
+  //   field (string) — nom du champ
+  //   value (any)    — nouvelle valeur
   const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
+  // Ouvre le formulaire en mode création.
+  // Remet le formulaire à zéro et efface la cible d'édition.
   const openCreate = () => {
     setEditTarget(null);
     setForm(EMPTY_FORM);
@@ -45,6 +57,9 @@ export default function AdminCategories() {
     setShowForm(true);
   };
 
+  // Ouvre le formulaire en mode édition, pré-rempli avec les données de la catégorie.
+  // Paramètres :
+  //   cat (object) — catégorie à éditer
   const openEdit = (cat) => {
     setEditTarget(cat);
     setForm({
@@ -56,6 +71,10 @@ export default function AdminCategories() {
     setShowForm(true);
   };
 
+  // Soumet le formulaire : crée ou met à jour la catégorie selon editTarget.
+  // Si editTarget est null → création ; sinon → mise à jour de la catégorie ciblée.
+  // L'order_index des nouvelles catégories est initialisé à la longueur de la liste actuelle
+  // (position en dernier dans l'ordre d'affichage).
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) { setFormError('Le nom est obligatoire.'); return; }
@@ -74,7 +93,7 @@ export default function AdminCategories() {
           name: form.name.trim(),
           description: form.description.trim(),
           image_url: form.image_url.trim(),
-          order_index: categories.length,
+          order_index: categories.length, // Positionnée en dernier par défaut
         });
         setFeedback(`Catégorie "${form.name}" créée.`);
       }
@@ -88,22 +107,28 @@ export default function AdminCategories() {
     }
   };
 
-  // Bascule la visibilité de la catégorie sur la page d'accueil.
-  // Optimistic update : met à jour l'affichage local immédiatement sans attendre l'API,
-  // appel API en arrière-plan. Si l'API échoue, on recharge depuis le serveur pour
-  // remettre l'état à jour et éviter un affichage incohérent avec la réalité de la base.
+  // Bascule la visibilité de la catégorie sur la page d'accueil (visible ↔ masqué).
+  // Optimistic update : met à jour l'état local immédiatement sans attendre l'API.
+  // Si l'API échoue, on recharge depuis le serveur pour remettre l'état cohérent.
+  // Paramètres :
+  //   cat (object) — catégorie à basculer (utilisée pour l'id, le nom et l'état visible courant)
   const handleToggleVisible = async (cat) => {
-    const newVisible = cat.visible === false;
+    const newVisible = cat.visible === false; // false ou undefined/null → passe à true
     setCategories((prev) => prev.map((c) => c.id === cat.id ? { ...c, visible: newVisible } : c));
     try {
       await adminService.setCategoryVisible(cat.id, newVisible);
       setFeedback(`Catégorie "${cat.name}" ${newVisible ? 'affichée' : 'masquée'} sur l'accueil.`);
     } catch (e) {
       setFeedback(`Erreur : ${e.message}`);
-      load();
+      load(); // Rollback : recharge depuis le serveur en cas d'échec
     }
   };
 
+  // Supprime définitivement une catégorie après confirmation.
+  // Attention : les produits liés à cette catégorie doivent être réaffectés au préalable
+  // car la suppression peut échouer si des produits y sont encore rattachés (contrainte FK).
+  // Paramètres :
+  //   cat (object) — catégorie à supprimer
   const handleDelete = async (cat) => {
     if (!globalThis.confirm(`Supprimer la catégorie "${cat.name}" ? Cette action est irréversible. Les produits liés doivent être réaffectés au préalable.`)) return;
     try {
@@ -115,29 +140,37 @@ export default function AdminCategories() {
     }
   };
 
-  // Réordonne les catégories en échangeant deux éléments adjacents.
-  // Trie d'abord par order_index pour garantir un ordre stable avant l'échange,
-  // fait l'échange, réassigne des index 0,1,2... pour éviter les doublons ou les trous,
-  // puis sauvegarde tous les order_index en parallèle (Promise.all) pour limiter la latence.
+  // Réordonne les catégories en échangeant deux éléments adjacents (déplacement haut/bas).
+  // Algorithme :
+  //   1. Trie la liste par order_index (ordre stable avant échange)
+  //   2. Échange les deux éléments aux positions idx et targetIdx
+  //   3. Réassigne des index séquentiels 0,1,2… (évite les doublons ou les trous)
+  //   4. Sauvegarde tous les order_index en parallèle via Promise.all
+  // Paramètres :
+  //   cat (object) — catégorie à déplacer
+  //   dir (string) — 'up' ou 'down'
   const handleMove = async (cat, dir) => {
     const list = [...categories].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
     const idx = list.findIndex((c) => c.id === cat.id);
     const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= list.length) return;
+    if (targetIdx < 0 || targetIdx >= list.length) return; // Déjà au bord, rien à faire
     const reordered = [...list];
-    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
-    const withIndices = reordered.map((c, i) => ({ ...c, order_index: i }));
-    setCategories(withIndices);
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]]; // Échange
+    const withIndices = reordered.map((c, i) => ({ ...c, order_index: i })); // Réindexation
+    setCategories(withIndices); // Mise à jour locale immédiate (optimistic)
     try {
       await Promise.all(withIndices.map((c) => adminService.updateCategory(c.id, { order_index: c.order_index })));
     } catch (e) {
       setFeedback(`Erreur : ${e.message}`);
-      load();
+      load(); // Rollback
     }
   };
 
+  // Catégories triées par order_index pour l'affichage dans le tableau.
+  // Calculé à chaque rendu depuis le state (pas de mémo car peu coûteux).
   const sorted = [...categories].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
+  // Libellé dynamique du bouton de soumission selon l'état du formulaire
   let submitLabel = 'Créer';
   if (saving) submitLabel = 'Sauvegarde…';
   else if (editTarget) submitLabel = 'Mettre à jour';
@@ -156,6 +189,7 @@ export default function AdminCategories() {
       {error && <div className="notice notice--warning">Erreur : {error}</div>}
       {feedback && <div className="notice notice--info">{feedback}</div>}
 
+      {/* Formulaire création / édition (affiché en accordéon quand showForm=true) */}
       {showForm && (
         <form className="panel stack" onSubmit={handleSubmit} noValidate>
           <h3>{editTarget ? `Modifier "${editTarget.name}"` : 'Nouvelle catégorie'}</h3>
@@ -194,6 +228,7 @@ export default function AdminCategories() {
                 value={form.image_url}
                 onChange={(e) => set('image_url', e.target.value)}
               />
+              {/* Aperçu en direct de l'image saisie. Masqué si l'URL est cassée (onError). */}
               {form.image_url && (
                 <img
                   src={form.image_url}
@@ -203,7 +238,6 @@ export default function AdminCategories() {
                 />
               )}
             </div>
-
           </div>
 
           <div className="inline-actions">
@@ -213,6 +247,7 @@ export default function AdminCategories() {
         </form>
       )}
 
+      {/* Tableau des catégories — affiché une fois le chargement terminé */}
       {!loading && (
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -236,13 +271,14 @@ export default function AdminCategories() {
                 </tr>
               ) : sorted.map((cat, idx) => (
                 <tr key={cat.id}>
+                  {/* Colonne position : boutons ▲ / ▼ + numéro d'ordre */}
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <div className="inline-actions" style={{ gap: 2 }}>
                       <button
                         type="button"
                         className="btn btn--secondary"
                         style={{ fontSize: '0.8rem', padding: '2px 7px', lineHeight: 1 }}
-                        disabled={idx === 0}
+                        disabled={idx === 0} // Désactivé si déjà en première position
                         onClick={() => handleMove(cat, 'up')}
                         aria-label="Monter"
                       >▲</button>
@@ -250,13 +286,15 @@ export default function AdminCategories() {
                         type="button"
                         className="btn btn--secondary"
                         style={{ fontSize: '0.8rem', padding: '2px 7px', lineHeight: 1 }}
-                        disabled={idx === sorted.length - 1}
+                        disabled={idx === sorted.length - 1} // Désactivé si déjà en dernière position
                         onClick={() => handleMove(cat, 'down')}
                         aria-label="Descendre"
                       >▼</button>
                       <span className="helper-text" style={{ fontSize: '0.78rem', minWidth: 18, textAlign: 'center' }}>{idx + 1}</span>
                     </div>
                   </td>
+
+                  {/* Miniature de l'image, masquée si l'URL est cassée */}
                   <td>
                     {cat.image_url ? (
                       <img
@@ -269,11 +307,14 @@ export default function AdminCategories() {
                       <span className="helper-text" style={{ fontSize: '0.75rem' }}>Aucune</span>
                     )}
                   </td>
+
                   <td><strong>{cat.name}</strong></td>
                   <td><span className="helper-text">{cat.slug}</span></td>
                   <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {cat.description || <span className="helper-text">—</span>}
                   </td>
+
+                  {/* Bouton visibilité : rouge si masqué, secondaire si visible */}
                   <td>
                     <button
                       type="button"
@@ -284,6 +325,7 @@ export default function AdminCategories() {
                       {cat.visible === false ? 'Masqué' : 'Visible'}
                     </button>
                   </td>
+
                   <td>
                     <div className="inline-actions" style={{ gap: 6 }}>
                       <button type="button" className="btn btn--secondary" style={{ fontSize: '0.8rem', padding: '3px 10px' }} onClick={() => openEdit(cat)}>

@@ -2,20 +2,28 @@
 
 const nodemailer = require('nodemailer');
 
+// Instance du transporteur Nodemailer, mise en cache après la première initialisation.
+// null au démarrage — initialisée au premier envoi d'e-mail via getTransporter().
+// Cette variable persiste en mémoire tant que le serveur est en cours d'exécution,
+// ce qui évite de créer un nouveau transporteur à chaque envoi.
 let _transporter = null;
 
+// Retourne le transporteur SMTP configuré, en le créant s'il n'existe pas encore.
+// En production  : utilise les variables d'env SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS.
+// En développement : crée un compte Ethereal jetable (emails capturés, jamais envoyés).
+// Retourne : objet Nodemailer Transporter prêt à envoyer des e-mails.
 async function getTransporter() {
   if (_transporter) return _transporter;
 
   // En prod : utiliser les variables d'env SMTP_*
   if (process.env.SMTP_HOST) {
     _transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
+      host: process.env.SMTP_HOST,        // Adresse du serveur SMTP (ex: smtp.sendgrid.net)
+      port: Number(process.env.SMTP_PORT) || 587, // Port SMTP (587 = TLS, 465 = SSL)
+      secure: process.env.SMTP_SECURE === 'true', // true = SSL direct, false = STARTTLS
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env.SMTP_USER,      // Login du compte SMTP
+        pass: process.env.SMTP_PASS,      // Mot de passe du compte SMTP
       },
     });
     console.info('[MAILER] Transporter SMTP configuré via variables d\'env.');
@@ -23,6 +31,7 @@ async function getTransporter() {
   }
 
   // En dev : créer un compte de test Ethereal automatiquement
+  // Ethereal capte les e-mails et génère une URL de prévisualisation, sans rien envoyer.
   const testAccount = await nodemailer.createTestAccount();
   _transporter = nodemailer.createTransport({
     host: 'smtp.ethereal.email',
@@ -34,12 +43,23 @@ async function getTransporter() {
   return _transporter;
 }
 
+// Adresse expéditeur affichée dans le champ "De:" de tous les e-mails.
+// Lue depuis la variable d'env MAIL_FROM, sinon utilise l'adresse par défaut.
 const FROM = process.env.MAIL_FROM || '"Althea Systems" <noreply@althea-systems.com>';
 
+// Envoie un e-mail via le transporteur SMTP configuré.
+// Paramètres :
+//   to      (string) — adresse e-mail du destinataire
+//   subject (string) — objet de l'e-mail
+//   html    (string) — corps HTML de l'e-mail
+//   text    (string) — corps texte brut (fallback pour les clients sans HTML)
+// Retourne : objet info Nodemailer (contient l'ID du message, l'URL Ethereal en dev, etc.)
+// En cas d'erreur : l'exception est attrapée et loguée sans relancer (envoi silencieux).
 async function sendMail({ to, subject, html, text }) {
   try {
     const transporter = await getTransporter();
     const info = await transporter.sendMail({ from: FROM, to, subject, html, text });
+    // getTestMessageUrl retourne une URL de prévisualisation Ethereal (null en prod)
     const preview = nodemailer.getTestMessageUrl(info);
     if (preview) {
       console.info(`[MAILER] Aperçu email (Ethereal) : ${preview}`);
@@ -50,8 +70,13 @@ async function sendMail({ to, subject, html, text }) {
   }
 }
 
-// --- Templates ---
+// ── TEMPLATES E-MAIL ──────────────────────────────────────────────────────────
+// Chaque fonction ci-dessous est un template métier : elle construit le contenu
+// de l'e-mail (sujet + HTML + texte) et délègue l'envoi à sendMail().
 
+// Envoie un e-mail de bienvenue après la création d'un compte.
+// Paramètres :
+//   user (object) — { email, first_name } — destinataire et prénom affiché
 async function sendWelcome(user) {
   await sendMail({
     to: user.email,
@@ -66,7 +91,15 @@ async function sendWelcome(user) {
   });
 }
 
+// Envoie la confirmation d'une commande avec le détail des articles et le total.
+// Paramètres :
+//   user  (object) — { email, first_name } — client destinataire
+//   order (object) — { id, items, total_amount } — commande passée
+//     order.items[].product_name (string) — nom du produit
+//     order.items[].quantity     (number) — quantité commandée
+//     order.items[].line_total   (number) — sous-total de la ligne en euros
 async function sendOrderConfirmation(user, order) {
+  // Construit les lignes HTML de la liste d'articles (<li> par produit)
   const itemsHtml = (order.items || [])
     .map((i) => `<li>${i.product_name || i.product_id} × ${i.quantity} — ${Number(i.line_total || 0).toFixed(2)} €</li>`)
     .join('');
@@ -87,6 +120,10 @@ async function sendOrderConfirmation(user, order) {
   });
 }
 
+// Envoie un lien de réinitialisation de mot de passe (valable 1 heure).
+// Paramètres :
+//   user      (object) — { email, first_name } — utilisateur demandeur
+//   resetLink (string) — URL complète avec le token de reset (ex: http://.../#/reset-password?token=xxx)
 async function sendPasswordReset(user, resetLink) {
   await sendMail({
     to: user.email,
@@ -103,6 +140,10 @@ async function sendPasswordReset(user, resetLink) {
   });
 }
 
+// Envoie un e-mail de vérification d'adresse après l'inscription.
+// Paramètres :
+//   user       (object) — { email, first_name } — nouvel utilisateur
+//   verifyLink (string) — URL de confirmation contenant le token de vérification (valable 24h)
 async function sendEmailVerification(user, verifyLink) {
   await sendMail({
     to: user.email,
@@ -120,6 +161,11 @@ async function sendEmailVerification(user, verifyLink) {
   });
 }
 
+// Envoie le code OTP (One-Time Password) pour la validation 2FA des administrateurs.
+// Déclenché lors de la connexion d'un compte marqué is_admin=true.
+// Paramètres :
+//   user (object) — { email, first_name } — admin se connectant
+//   otp  (string) — code à 6 chiffres valable 10 minutes
 async function sendAdminOtp(user, otp) {
   await sendMail({
     to: user.email,
@@ -136,6 +182,12 @@ async function sendAdminOtp(user, otp) {
   });
 }
 
+// Envoie la réponse d'un admin à un message de contact (page support).
+// Appelé depuis PATCH /api/pg/admin/messages/:id lorsque le statut passe à "replied".
+// Paramètres :
+//   to        (string) — adresse e-mail du client ayant envoyé le message
+//   subject   (string) — objet du message original (utilisé pour le "Re: ...")
+//   replyText (string) — texte de la réponse saisie par l'admin dans l'interface
 async function sendAdminReply(to, subject, replyText) {
   await sendMail({
     to,
